@@ -127,6 +127,8 @@ Practice: screenshot the specific screen/flow you're referencing (not just the h
 
 **Invites:** admin generates an `Invite` (unique code, optionally QR-wrapped). If `requires_admin_verification = false`, using the code creates an active `WorkspaceMembership` immediately. If `true`, it creates a `status = pending` membership and the admin approves/rejects it from a request queue.
 
+**Joining a session by code:** `joinSessionByCode(code: string): Promise<{ success: boolean; error?: string; sessionId?: string }>` — looks up the `Invite` row by code and checks `expires_at`. On a valid, unexpired code it grants access (`SessionAccessGrant` for a session-scoped invite, `WorkspaceMembership` for a workspace-scoped one) and returns `{ success: true, sessionId }` so the caller can redirect straight into the session. On an unknown or expired code it returns `{ success: false, error: "Invalid or expired code" }` — no separate distinction between "wrong code" and "expired code" is surfaced to the user.
+
 **Access enforcement:** every workspace-scoped table gets a Postgres Row Level Security policy checking for an active `WorkspaceMembership` linking `auth.uid()` to that workspace — enforced at the database layer, not hand-written in app code. F&F workspaces skip the private-visibility check entirely (no private mode by design).
 
 **Flagged for the Voting Session module:** the original doc calls for admins granting session access to specific users/departments, not just "all workspace members." This needs its own table (`SessionAccessGrant`: session_id + user or, later, department) — finalized when the Voting Session module is designed next, since that's where it's consumed.
