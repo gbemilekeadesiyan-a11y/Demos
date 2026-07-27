@@ -1,0 +1,1 @@
+-- Stub — Auth & Identity module (public.profiles table). See demos-system-design.md § 8.1.

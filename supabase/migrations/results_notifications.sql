@@ -1,0 +1,1 @@
+-- Stub — Results, Realtime & Notifications module. See demos-system-design.md § 8.4.
