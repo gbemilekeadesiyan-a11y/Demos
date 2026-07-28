@@ -62,7 +62,7 @@ export async function signInAnonymously(): Promise<{ success: boolean; error?: s
   return { success: true }
 }
 
-export function joinSessionByCode(
+export async function joinSessionByCode(
   code: string
 ): Promise<{ success: boolean; error?: string; sessionId?: string }> {
   throw new Error('not implemented')
