@@ -13,6 +13,7 @@ export type VotingSession = {
   results_visibility: 'hidden_until_close' | 'live' | 'after_you_vote'
   start_time: string | null
   end_time: string | null
+  created_by: string
   created_at: string
 }
 
