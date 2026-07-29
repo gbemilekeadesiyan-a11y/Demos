@@ -43,6 +43,7 @@ demos-system-design.md
 - One migration file per module, matching the module breakdown in `demos-system-design.md` Section 8, named after the feature it belongs to.
 - Auth handled via Supabase (`auth.users` + `public.profiles` split — see design doc Section 8.1). Never write to `auth.users` directly.
 - Typography: MuseoModerno (via next/font/google) for headings and large display text only. Everything else stays on the existing sans-serif. Don't re-decide this per page.
+- UI varies by `Workspace.type` — identical layout/components for both, varying only visual treatment via a theme. `standard` = restrained dark palette, no avatars, information-dense. `ff` = brighter accents, avatar clusters, image-friendly cards, playful copy. Don't fork into separate component trees.
 
 ## Rules for AI changes
 - Ask before adding new dependencies.
