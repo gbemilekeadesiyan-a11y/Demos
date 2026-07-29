@@ -27,6 +27,9 @@ create table public.voting_sessions (
   created_at timestamptz not null default now()
 );
 
+comment on column public.voting_sessions.visibility is
+  'Descriptive metadata only — not enforced as an access gate. Access is controlled entirely by who_can_vote; see can_access_session() below.';
+
 create index voting_sessions_workspace_id_idx on public.voting_sessions (workspace_id);
 
 create table public.session_options (
@@ -35,10 +38,16 @@ create table public.session_options (
   label text not null,
   description text,
   image_url text,
+  -- Option order is otherwise non-deterministic, which breaks ranked-choice
+  -- ballots and the drag-to-reorder UI. Callers must ORDER BY this — adding
+  -- that to getSessionDetails's query is a follow-up, not part of this
+  -- migration (see app/sessions/_lib/actions.ts).
+  display_order integer not null default 0,
   created_at timestamptz not null default now()
 );
 
 create index session_options_session_id_idx on public.session_options (session_id);
+create index session_options_session_id_display_order_idx on public.session_options (session_id, display_order);
 
 create table public.votes (
   id uuid primary key default gen_random_uuid(),
@@ -118,6 +127,13 @@ begin
   end if;
 
   if v_session.who_can_vote = 'public_link' then
+    -- public_link allows anyone, but an anonymous caller only when the
+    -- session opted into it — see demos-system-design.md § 8.3. Same
+    -- is_anonymous check Supabase's own JWT carries, used the same way
+    -- new.is_anonymous is checked in handle_new_user() (002_profiles.sql).
+    if coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) and not v_session.allow_anonymous_vote then
+      return false;
+    end if;
     return true;
   end if;
 
@@ -209,6 +225,18 @@ create policy "Session options are visible to whoever can access the session"
 create policy "Admins can add options to their sessions"
   on public.session_options for insert
   with check (
+    public.is_workspace_admin((select workspace_id from public.voting_sessions where id = session_id))
+  );
+
+create policy "Admins can update options in their sessions"
+  on public.session_options for update
+  using (
+    public.is_workspace_admin((select workspace_id from public.voting_sessions where id = session_id))
+  );
+
+create policy "Admins can delete options from their sessions"
+  on public.session_options for delete
+  using (
     public.is_workspace_admin((select workspace_id from public.voting_sessions where id = session_id))
   );
 
@@ -322,6 +350,21 @@ begin
 
   if not public.can_access_session(p_session_id) then
     return jsonb_build_object('success', false, 'error', 'Not eligible to vote in this session');
+  end if;
+
+  if v_session.vote_format = 'single' and jsonb_array_length(p_selections) <> 1 then
+    return jsonb_build_object('success', false, 'error', 'Select exactly one option');
+  end if;
+
+  if v_session.vote_format = 'multiple' and jsonb_array_length(p_selections) < 1 then
+    return jsonb_build_object('success', false, 'error', 'Select at least one option');
+  end if;
+
+  if v_session.vote_format in ('single', 'multiple') and exists (
+    select 1 from jsonb_array_elements(p_selections) as sel
+    where sel ->> 'rank' is not null
+  ) then
+    return jsonb_build_object('success', false, 'error', 'Rank is not allowed for this vote format');
   end if;
 
   if v_session.vote_format = 'ranked' and exists (

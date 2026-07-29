@@ -60,6 +60,21 @@ export async function addSessionOption(
 ): Promise<{ success: boolean; error?: string; optionId?: string }> {
   const supabase = await createClient()
 
+  // Append to the end: one more than the current highest display_order for
+  // this session (0 if it has none yet). See supabase/migrations/005_voting_sessions.sql.
+  const { data: lastOption, error: lastOptionError } = await supabase
+    .from('session_options')
+    .select('display_order')
+    .eq('session_id', sessionId)
+    .order('display_order', { ascending: false })
+    .limit(1)
+
+  if (lastOptionError) {
+    return { success: false, error: lastOptionError.message }
+  }
+
+  const nextDisplayOrder = lastOption && lastOption.length > 0 ? lastOption[0].display_order + 1 : 0
+
   const { data, error } = await supabase
     .from('session_options')
     .insert({
@@ -67,6 +82,7 @@ export async function addSessionOption(
       label: formData.label,
       description: formData.description ?? null,
       image_url: formData.imageUrl ?? null,
+      display_order: nextDisplayOrder,
     })
     .select('id')
     .single()
@@ -237,6 +253,7 @@ export async function getSessionDetails(sessionId: string): Promise<{
     .from('session_options')
     .select('id, session_id, label, description, image_url')
     .eq('session_id', sessionId)
+    .order('display_order')
 
   if (optionsError) {
     return { success: false, error: optionsError.message }
