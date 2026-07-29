@@ -34,13 +34,13 @@ Next.js (App Router) frontend + API routes/Server Actions, Supabase for Postgres
   /types                    — DB types generated via `supabase gen types typescript` (don't hand-edit)
 
 /supabase
-  /migrations               — SQL files, one per module, named to match the feature: workspaces.sql, voting_sessions.sql, results_notifications.sql
+  /migrations               — SQL files, one per module, numbered prefix + feature name: 002_profiles.sql, 003_workspaces.sql, 005_voting_sessions.sql
     (Supabase CLI requires this exact folder location — the one exception to feature colocation)
 CLAUDE.md
 demos-system-design.md
 ```
 - Types are generated from the database, not hand-written — run the generator after any schema change instead of manually editing type files.
-- One migration file per module, matching the module breakdown in `demos-system-design.md` Section 8, named after the feature it belongs to.
+- One migration file per module, matching the module breakdown in `demos-system-design.md` Section 8. Migrations use a numbered prefix (`00N_feature.sql`), applied in filename order — not bare feature names.
 - Auth handled via Supabase (`auth.users` + `public.profiles` split — see design doc Section 8.1). Never write to `auth.users` directly.
 - Typography: MuseoModerno (via next/font/google) for headings and large display text only. Everything else stays on the existing sans-serif. Don't re-decide this per page.
 - UI varies by `Workspace.type` — identical layout/components for both, varying only visual treatment via a theme. `standard` = restrained dark palette, no avatars, information-dense. `ff` = brighter accents, avatar clusters, image-friendly cards, playful copy. Don't fork into separate component trees.

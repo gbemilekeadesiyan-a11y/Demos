@@ -1,1 +1,0 @@
--- Stub — Workspace, Membership & Invite module. See demos-system-design.md § 8.2.

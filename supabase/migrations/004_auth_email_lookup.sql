@@ -17,3 +17,4 @@ as $$
     where lower(email) = lower(p_email)
   );
 $$;
+

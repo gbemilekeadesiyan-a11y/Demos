@@ -1,1 +1,0 @@
--- Stub — Voting Session lifecycle & vote casting/tallying module. See demos-system-design.md § 8.3.
