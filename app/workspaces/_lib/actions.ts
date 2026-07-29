@@ -2,7 +2,42 @@
 
 import { randomBytes } from 'crypto'
 import { createClient } from '../../../lib/supabase/server'
+import type { UserSummary } from '../../(auth)/_lib/schema'
 import type { Workspace, WorkspaceMembership } from './schema'
+
+type ProfileRow = { id: string; username: string; first_name: string; last_name: string }
+
+// One batched profiles lookup for however many creator ids are in the
+// result set — not a per-row round trip. Same pattern as
+// app/sessions/_lib/actions.ts's fetchUserSummaries; kept local here since
+// this file's supabase client instance isn't shared across features.
+async function fetchUserSummaries(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userIds: (string | null | undefined)[]
+): Promise<Map<string, UserSummary>> {
+  const uniqueIds = [...new Set(userIds.filter((id): id is string => Boolean(id)))]
+  const map = new Map<string, UserSummary>()
+
+  if (uniqueIds.length === 0) {
+    return map
+  }
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, username, first_name, last_name')
+    .in('id', uniqueIds)
+
+  for (const profile of (data ?? []) as ProfileRow[]) {
+    map.set(profile.id, {
+      id: profile.id,
+      username: profile.username,
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+    })
+  }
+
+  return map
+}
 
 export async function createWorkspace(formData: {
   name: string
@@ -175,9 +210,30 @@ export async function listMyWorkspaces(): Promise<{
     return { success: false, error: error.message }
   }
 
-  const workspaces = (data ?? [])
-    .map((row) => (row as unknown as { workspaces: Workspace | null }).workspaces)
-    .filter((workspace): workspace is Workspace => workspace !== null)
+  type WorkspaceRow = {
+    id: string
+    name: string
+    type: 'standard' | 'ff'
+    created_by: string
+    settings: Record<string, unknown>
+  }
+
+  const rows = (data ?? [])
+    .map((row) => (row as unknown as { workspaces: WorkspaceRow | null }).workspaces)
+    .filter((row): row is WorkspaceRow => row !== null)
+
+  const profiles = await fetchUserSummaries(
+    supabase,
+    rows.map((row) => row.created_by)
+  )
+
+  const workspaces: Workspace[] = rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    settings: row.settings,
+    createdBy: profiles.get(row.created_by) ?? null,
+  }))
 
   return { success: true, workspaces }
 }

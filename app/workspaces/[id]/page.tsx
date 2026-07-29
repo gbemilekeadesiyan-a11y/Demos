@@ -15,7 +15,7 @@ function buildFakeDetails(
       id: workspaceId,
       name: 'Product Team',
       type: 'standard',
-      created_by: adminId,
+      createdBy: { id: adminId, username: 'you', firstName: 'You', lastName: '' },
       settings: {},
     },
     members: [

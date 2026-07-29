@@ -167,58 +167,90 @@ export async function grantSessionAccess(
   return { success: true }
 }
 
-export async function openSession(sessionId: string): Promise<{ success: boolean; error?: string }> {
+export async function listSessionAccessGrants(sessionId: string): Promise<{
+  success: boolean
+  error?: string
+  grants?: { id: string; user: UserSummary | null; createdAt: string }[]
+}> {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('voting_sessions')
-    .update({ status: 'open' })
-    .eq('id', sessionId)
-    .eq('status', 'draft')
-    .select()
-    .single()
+  // RLS ("Grantees and admins can view session access grants") limits this
+  // to the session's workspace admins plus each grantee seeing their own row.
+  const { data, error } = await supabase
+    .from('session_access_grants')
+    .select('id, user_id, created_at')
+    .eq('session_id', sessionId)
 
   if (error) {
     return { success: false, error: error.message }
   }
 
+  const rows = data ?? []
+  const profiles = await fetchUserSummaries(
+    supabase,
+    rows.map((row) => row.user_id)
+  )
+
+  return {
+    success: true,
+    grants: rows.map((row) => ({
+      id: row.id,
+      user: profiles.get(row.user_id) ?? null,
+      createdAt: row.created_at,
+    })),
+  }
+}
+
+async function transitionSessionStatus(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  sessionId: string,
+  from: 'draft' | 'open' | 'closed',
+  to: 'open' | 'closed' | 'results_released'
+): Promise<{ success: boolean; error?: string }> {
+  const { data: session, error: sessionError } = await supabase
+    .from('voting_sessions')
+    .select('status')
+    .eq('id', sessionId)
+    .single()
+
+  if (sessionError || !session) {
+    return { success: false, error: sessionError?.message ?? 'Session not found' }
+  }
+
+  if (session.status !== from) {
+    return { success: false, error: `Cannot move to "${to}" from "${session.status}"` }
+  }
+
+  const { error: updateError } = await supabase
+    .from('voting_sessions')
+    .update({ status: to })
+    .eq('id', sessionId)
+    .eq('status', from)
+    .select()
+    .single()
+
+  if (updateError) {
+    // The eq('status', from) guard means 0 rows matched — status changed
+    // between the check above and this update (race), not a query error.
+    return { success: false, error: 'Session status changed before this could complete — please retry' }
+  }
+
   return { success: true }
+}
+
+export async function openSession(sessionId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+  return transitionSessionStatus(supabase, sessionId, 'draft', 'open')
 }
 
 export async function closeSession(sessionId: string): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
-
-  const { error } = await supabase
-    .from('voting_sessions')
-    .update({ status: 'closed' })
-    .eq('id', sessionId)
-    .eq('status', 'open')
-    .select()
-    .single()
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  return { success: true }
+  return transitionSessionStatus(supabase, sessionId, 'open', 'closed')
 }
 
 export async function releaseResults(sessionId: string): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
-
-  const { error } = await supabase
-    .from('voting_sessions')
-    .update({ status: 'results_released' })
-    .eq('id', sessionId)
-    .eq('status', 'closed')
-    .select()
-    .single()
-
-  if (error) {
-    return { success: false, error: error.message }
-  }
-
-  return { success: true }
+  return transitionSessionStatus(supabase, sessionId, 'closed', 'results_released')
 }
 
 export async function castVote(
@@ -380,13 +412,25 @@ export async function getSessionResults(sessionId: string): Promise<{
   }
 
   if (!canViewResults) {
-    return { success: true, results: [], totalVotes: 0, resultsLocked: true }
+    // See supabase/migrations/006_session_vote_count.sql — a plain count on
+    // `votes` here would be RLS-limited to the caller's own vote, not the
+    // true total.
+    const { data: voteCount, error: voteCountError } = await supabase.rpc('count_session_votes', {
+      target_session_id: sessionId,
+    })
+
+    if (voteCountError) {
+      return { success: false, error: voteCountError.message }
+    }
+
+    return { success: true, results: [], totalVotes: voteCount ?? 0, resultsLocked: true }
   }
 
   const { data: options, error: optionsError } = await supabase
     .from('session_options')
     .select('id, label')
     .eq('session_id', sessionId)
+    .order('display_order')
 
   if (optionsError) {
     return { success: false, error: optionsError.message }

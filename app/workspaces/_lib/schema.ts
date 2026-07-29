@@ -6,7 +6,10 @@ export type Workspace = {
   id: string
   name: string
   type: 'standard' | 'ff'
-  created_by: string
+  // Populated by a joined profiles lookup in listMyWorkspaces /
+  // getWorkspaceDetails; null for an anonymous creator (no profiles row)
+  // rather than failing the query.
+  createdBy: UserSummary | null
   settings: Record<string, unknown>
 }
 
