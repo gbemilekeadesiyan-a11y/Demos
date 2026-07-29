@@ -52,6 +52,13 @@ export async function castVote(
   throw new Error('not implemented')
 }
 
+export async function listSessions(
+  workspaceId: string,
+  filter?: { status?: 'draft' | 'open' | 'closed' | 'results_released'; createdByMe?: boolean }
+): Promise<{ success: boolean; error?: string; sessions?: VotingSession[] }> {
+  throw new Error('not implemented')
+}
+
 export async function getSessionDetails(sessionId: string): Promise<{
   success: boolean
   error?: string
