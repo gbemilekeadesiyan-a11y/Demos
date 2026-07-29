@@ -2,7 +2,7 @@
 
 import { randomBytes } from 'crypto'
 import { createClient } from '../../../lib/supabase/server'
-import type { Workspace } from './schema'
+import type { Workspace, WorkspaceMembership } from './schema'
 
 export async function createWorkspace(formData: {
   name: string
@@ -180,4 +180,14 @@ export async function listMyWorkspaces(): Promise<{
     .filter((workspace): workspace is Workspace => workspace !== null)
 
   return { success: true, workspaces }
+}
+
+export async function getWorkspaceDetails(workspaceId: string): Promise<{
+  success: boolean
+  error?: string
+  workspace?: Workspace
+  members?: WorkspaceMembership[]
+  pendingRequests?: WorkspaceMembership[]
+}> {
+  throw new Error('not implemented')
 }

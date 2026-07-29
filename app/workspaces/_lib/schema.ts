@@ -7,3 +7,12 @@ export type Workspace = {
   created_by: string
   settings: Record<string, unknown>
 }
+
+export type WorkspaceMembership = {
+  id: string
+  workspace_id: string
+  user_id: string
+  role: 'admin' | 'moderator' | 'member'
+  status: 'active' | 'pending'
+  created_at: string
+}
