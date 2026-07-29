@@ -1,48 +1,104 @@
-import Link from 'next/link'
 import { listMyWorkspaces } from './_lib/actions'
+import type { Workspace } from './_lib/schema'
+import { listSessions } from '../sessions/_lib/actions'
+import type { VotingSession } from '../sessions/_lib/schema'
+import { WorkspaceDashboardClient } from './_components/WorkspaceDashboardClient'
+
+function buildFakeSessions(workspaceId: string): VotingSession[] {
+  const now = new Date().toISOString()
+  return [
+    {
+      id: 'fake-s1',
+      workspace_id: workspaceId,
+      title: 'Where should we eat lunch tomorrow?',
+      description: null,
+      vote_format: 'single',
+      visibility: 'public',
+      status: 'open',
+      who_can_vote: 'all_members',
+      allow_anonymous_vote: true,
+      results_visibility: 'hidden_until_close',
+      start_time: null,
+      end_time: null,
+      created_by: 'fake-admin',
+      created_at: now,
+    },
+    {
+      id: 'fake-s2',
+      workspace_id: workspaceId,
+      title: 'Q3 roadmap priorities',
+      description: null,
+      vote_format: 'multiple',
+      visibility: 'private',
+      status: 'draft',
+      who_can_vote: 'all_members',
+      allow_anonymous_vote: false,
+      results_visibility: 'hidden_until_close',
+      start_time: null,
+      end_time: null,
+      created_by: 'fake-admin',
+      created_at: now,
+    },
+    {
+      id: 'fake-s3',
+      workspace_id: workspaceId,
+      title: 'Best UI/UX design software',
+      description: null,
+      vote_format: 'single',
+      visibility: 'public',
+      status: 'closed',
+      who_can_vote: 'public_link',
+      allow_anonymous_vote: true,
+      results_visibility: 'live',
+      start_time: null,
+      end_time: null,
+      created_by: 'fake-user-2',
+      created_at: now,
+    },
+    {
+      id: 'fake-s4',
+      workspace_id: workspaceId,
+      title: 'Team offsite location',
+      description: null,
+      vote_format: 'ranked',
+      visibility: 'public',
+      status: 'results_released',
+      who_can_vote: 'all_members',
+      allow_anonymous_vote: false,
+      results_visibility: 'after_you_vote',
+      start_time: null,
+      end_time: null,
+      created_by: 'fake-user-3',
+      created_at: now,
+    },
+  ]
+}
 
 export default async function WorkspacesPage() {
-  const result = await listMyWorkspaces()
-  const workspaces = result.success ? (result.workspaces ?? []) : []
+  const workspacesResult = await listMyWorkspaces()
+  const workspaces: Workspace[] = workspacesResult.success ? (workspacesResult.workspaces ?? []) : []
+
+  const initialWorkspaceId = workspaces[0]?.id ?? null
+
+  let initialSessions: VotingSession[] = []
+  let usingFakeSessions = false
+
+  if (initialWorkspaceId) {
+    const sessionsResult = await listSessions(initialWorkspaceId)
+    if (sessionsResult.success) {
+      initialSessions = sessionsResult.sessions ?? []
+    } else {
+      usingFakeSessions = true
+      initialSessions = buildFakeSessions(initialWorkspaceId)
+    }
+  }
 
   return (
-    <main className="min-h-screen bg-neutral-950 px-4 py-12">
-      <div className="mx-auto max-w-2xl">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-white">Your workspaces</h1>
-          <Link
-            href="/workspaces/create"
-            className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-neutral-950 transition hover:bg-neutral-200"
-          >
-            Create Workspace
-          </Link>
-        </div>
-
-        {!result.success && (
-          <p className="mt-6 text-sm text-red-400">{result.error ?? 'Could not load workspaces.'}</p>
-        )}
-
-        {result.success && workspaces.length === 0 && (
-          <p className="mt-6 text-sm text-neutral-400">
-            You&apos;re not in any workspaces yet. Create one to get started.
-          </p>
-        )}
-
-        {workspaces.length > 0 && (
-          <ul className="mt-6 flex flex-col gap-3">
-            {workspaces.map((workspace) => (
-              <li key={workspace.id}>
-                <Link
-                  href={`/workspaces/${workspace.id}`}
-                  className="block rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-white transition hover:border-neutral-600"
-                >
-                  {workspace.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </main>
+    <WorkspaceDashboardClient
+      workspaces={workspaces}
+      initialWorkspaceId={initialWorkspaceId}
+      initialSessions={initialSessions}
+      usingFakeSessions={usingFakeSessions}
+    />
   )
 }
