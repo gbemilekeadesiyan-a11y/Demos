@@ -20,7 +20,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       results_visibility: 'hidden_until_close',
       start_time: null,
       end_time: null,
-      created_by: 'fake-admin',
+      createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
       created_at: now,
     },
     {
@@ -36,7 +36,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       results_visibility: 'hidden_until_close',
       start_time: null,
       end_time: null,
-      created_by: 'fake-admin',
+      createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
       created_at: now,
     },
     {
@@ -52,7 +52,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       results_visibility: 'live',
       start_time: null,
       end_time: null,
-      created_by: 'fake-user-2',
+      createdBy: { id: 'fake-user-2', username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
       created_at: now,
     },
     {
@@ -68,7 +68,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       results_visibility: 'after_you_vote',
       start_time: null,
       end_time: null,
-      created_by: 'fake-user-3',
+      createdBy: { id: 'fake-user-3', username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
       created_at: now,
     },
   ]

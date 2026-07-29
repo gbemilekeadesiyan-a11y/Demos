@@ -1,7 +1,63 @@
 'use server'
 
 import { createClient } from '../../../lib/supabase/server'
+import type { UserSummary } from '../../(auth)/_lib/schema'
 import type { SessionOption, VotingSession } from './schema'
+
+type ProfileRow = { id: string; username: string; first_name: string; last_name: string }
+
+// One batched profiles lookup for however many creator ids are in the
+// result set — not a per-row round trip. PostgREST can't auto-embed
+// profiles here: voting_sessions.created_by FKs to auth.users, not
+// public.profiles, and auth.users isn't exposed via the API, so there's no
+// declared relationship for .select() to embed through.
+async function fetchUserSummaries(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userIds: (string | null | undefined)[]
+): Promise<Map<string, UserSummary>> {
+  const uniqueIds = [...new Set(userIds.filter((id): id is string => Boolean(id)))]
+  const map = new Map<string, UserSummary>()
+
+  if (uniqueIds.length === 0) {
+    return map
+  }
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, username, first_name, last_name')
+    .in('id', uniqueIds)
+
+  for (const profile of (data ?? []) as ProfileRow[]) {
+    map.set(profile.id, {
+      id: profile.id,
+      username: profile.username,
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+    })
+  }
+
+  return map
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toVotingSession(row: any, profiles: Map<string, UserSummary>): VotingSession {
+  return {
+    id: row.id,
+    workspace_id: row.workspace_id,
+    title: row.title,
+    description: row.description,
+    vote_format: row.vote_format,
+    visibility: row.visibility,
+    status: row.status,
+    who_can_vote: row.who_can_vote,
+    allow_anonymous_vote: row.allow_anonymous_vote,
+    results_visibility: row.results_visibility,
+    start_time: row.start_time,
+    end_time: row.end_time,
+    createdBy: profiles.get(row.created_by) ?? null,
+    created_at: row.created_at,
+  }
+}
 
 export async function createVotingSession(
   workspaceId: string,
@@ -227,7 +283,13 @@ export async function listSessions(
     return { success: false, error: error.message }
   }
 
-  return { success: true, sessions: (data ?? []) as VotingSession[] }
+  const rows = data ?? []
+  const profiles = await fetchUserSummaries(
+    supabase,
+    rows.map((row) => row.created_by)
+  )
+
+  return { success: true, sessions: rows.map((row) => toVotingSession(row, profiles)) }
 }
 
 export async function getSessionDetails(sessionId: string): Promise<{
@@ -248,6 +310,9 @@ export async function getSessionDetails(sessionId: string): Promise<{
   if (sessionError || !session) {
     return { success: false, error: sessionError?.message ?? 'Session not found' }
   }
+
+  const profiles = await fetchUserSummaries(supabase, [session.created_by])
+  const sessionWithCreator = toVotingSession(session, profiles)
 
   const { data: options, error: optionsError } = await supabase
     .from('session_options')
@@ -277,7 +342,7 @@ export async function getSessionDetails(sessionId: string): Promise<{
 
   return {
     success: true,
-    session: session as VotingSession,
+    session: sessionWithCreator,
     options: (options ?? []) as SessionOption[],
     hasVoted,
   }

@@ -26,6 +26,7 @@ function buildFakeDetails(
         role: 'admin',
         status: 'active',
         created_at: now,
+        user: { id: adminId, username: 'you', firstName: 'You', lastName: '' },
       },
       {
         id: 'fake-m2',
@@ -34,6 +35,7 @@ function buildFakeDetails(
         role: 'member',
         status: 'active',
         created_at: now,
+        user: { id: 'fake-user-2', username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
       },
       {
         id: 'fake-m3',
@@ -42,6 +44,7 @@ function buildFakeDetails(
         role: 'moderator',
         status: 'active',
         created_at: now,
+        user: { id: 'fake-user-3', username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
       },
     ],
     pendingRequests: [
@@ -52,6 +55,8 @@ function buildFakeDetails(
         role: 'member',
         status: 'pending',
         created_at: now,
+        // Demonstrates the anonymous-joiner case: no profiles row, so user is null.
+        user: null,
       },
     ],
   }

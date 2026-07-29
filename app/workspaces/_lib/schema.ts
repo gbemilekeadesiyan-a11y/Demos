@@ -1,3 +1,5 @@
+import type { UserSummary } from '@/app/(auth)/_lib/schema'
+
 // Placeholder until `lib/types/database.ts` is generated via
 // `supabase gen types typescript` — see demos-system-design.md § 3.
 export type Workspace = {
@@ -15,4 +17,7 @@ export type WorkspaceMembership = {
   role: 'admin' | 'moderator' | 'member'
   status: 'active' | 'pending'
   created_at: string
+  // Populated by a joined profiles lookup in getWorkspaceDetails; null for
+  // anonymous members (no profiles row) rather than failing the query.
+  user: UserSummary | null
 }

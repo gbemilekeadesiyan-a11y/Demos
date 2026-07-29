@@ -119,6 +119,8 @@ Practice: screenshot the specific screen/flow you're referencing (not just the h
 
 **Upgrade path (anon → full account):** Supabase's identity-linking function attaches an email/password to the *existing* anonymous session (same user id, not a new one) → a `profiles` row is created at that point. Any votes cast while anonymous stay attached, since the id never changes.
 
+**API contract — user references:** anywhere a server action's return type references a user (session/workspace creators, workspace members), it carries a `UserSummary` (`id`, `username`, `firstName`, `lastName` — joined from `profiles`) instead of a bare `auth.users` id, so the frontend never needs a second round-trip just to show a name. Joined via one batched `profiles` lookup per call (not a lookup per row). Anonymous users have no `profiles` row, so they resolve to `null` rather than failing the query — callers render a placeholder ("Guest", "Anonymous") for that case.
+
 ### 8.2 Workspace, Membership & Invite — *designed*
 
 **Creating a workspace:** the creator automatically gets a `WorkspaceMembership` row with `role = admin`. No separate step — founding is becoming admin.
@@ -131,6 +133,8 @@ Practice: screenshot the specific screen/flow you're referencing (not just the h
 
 **Access enforcement:** every workspace-scoped table gets a Postgres Row Level Security policy checking for an active `WorkspaceMembership` linking `auth.uid()` to that workspace — enforced at the database layer, not hand-written in app code. F&F workspaces skip the private-visibility check entirely (no private mode by design).
 
+**Membership rows carry a profile:** `getWorkspaceDetails`'s `members` and `pendingRequests` each carry `user: UserSummary | null` per the user-reference contract in § 8.1, not a bare `user_id` — `user_id` is still present for FK-level comparisons (e.g. "is this row the current user"), the profile is additive. A member can legitimately be anonymous (an anonymous session can still redeem a workspace invite code, since `join_workspace_by_code` only requires `auth.uid()` to be non-null), so `user` is `null` for those rows.
+
 **Flagged for the Voting Session module:** the original doc calls for admins granting session access to specific users/departments, not just "all workspace members." This needs its own table (`SessionAccessGrant`: session_id + user or, later, department) — finalized when the Voting Session module is designed next, since that's where it's consumed.
 
 ### 8.3 Voting Session lifecycle & vote casting/tallying — *designed*
@@ -138,6 +142,8 @@ Practice: screenshot the specific screen/flow you're referencing (not just the h
 **Lifecycle:** `VotingSession.status` = draft → open → closed → results_released. RLS refuses any `Vote` insert unless status = `open`.
 
 **Session-level access (`SessionAccessGrant`, finalized):** used when `who_can_vote = invited_list` — a specific user is granted access to one session independent of general workspace membership (department support deferred the same way as `WorkspaceGroup`). `all_members` checks `WorkspaceMembership` instead; `public_link` allows anyone (plus anonymous, if `allow_anonymous_vote`).
+
+**Session rows carry a profile:** `listSessions` and `getSessionDetails` return `createdBy: UserSummary | null` per the user-reference contract in § 8.1, joined via one batched `profiles` lookup for the whole result set rather than per row. In practice a session's creator is always a workspace admin (a registered user), so `null` should be rare here — but the same null-safe shape as `WorkspaceMembership.user` is used for consistency rather than assuming that always holds.
 
 **Double-voting prevention:** database-level uniqueness constraint on `Vote(session_id, user_id)` — structurally impossible, not just an app-level check.
 

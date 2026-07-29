@@ -5,8 +5,13 @@ import { AuraBackground } from '@/components/AuraBackground'
 import { approveMembership, generateInvite, rejectMembership, updateMemberRole } from '../../_lib/actions'
 import type { Workspace, WorkspaceMembership } from '../../_lib/schema'
 
-function shortId(id: string) {
-  return id.slice(0, 8)
+function displayName(member: WorkspaceMembership) {
+  if (!member.user) {
+    // Anonymous member — no profiles row to draw a name from.
+    return `Guest ${member.user_id.slice(0, 8)}`
+  }
+  const fullName = `${member.user.firstName} ${member.user.lastName}`.trim()
+  return fullName || member.user.username
 }
 
 export function WorkspaceDetailClient({
@@ -116,7 +121,7 @@ export function WorkspaceDetailClient({
               >
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-8 rounded-full bg-neutral-700" />
-                  <span className="font-mono text-xs text-neutral-300">{shortId(member.user_id)}</span>
+                  <span className="text-sm text-neutral-300">{displayName(member)}</span>
                 </div>
 
                 {isAdmin ? (
@@ -151,7 +156,7 @@ export function WorkspaceDetailClient({
                     key={request.id}
                     className="flex items-center justify-between rounded-lg border border-neutral-800 bg-neutral-900/80 px-4 py-3"
                   >
-                    <span className="font-mono text-xs text-neutral-300">{shortId(request.user_id)}</span>
+                    <span className="text-sm text-neutral-300">{displayName(request)}</span>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleApprove(request.id)}

@@ -67,7 +67,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       results_visibility: 'hidden_until_close',
       start_time: null,
       end_time: null,
-      created_by: 'fake-admin',
+      createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
       created_at: now,
     },
     {
@@ -83,7 +83,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       results_visibility: 'hidden_until_close',
       start_time: null,
       end_time: null,
-      created_by: 'fake-admin',
+      createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
       created_at: now,
     },
     {
@@ -99,7 +99,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       results_visibility: 'live',
       start_time: null,
       end_time: null,
-      created_by: 'fake-user-2',
+      createdBy: { id: 'fake-user-2', username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
       created_at: now,
     },
     {
@@ -115,10 +115,18 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       results_visibility: 'after_you_vote',
       start_time: null,
       end_time: null,
-      created_by: 'fake-user-3',
+      createdBy: { id: 'fake-user-3', username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
       created_at: now,
     },
   ]
+}
+
+function creatorName(session: VotingSession) {
+  if (!session.createdBy) {
+    return 'Anonymous'
+  }
+  const fullName = `${session.createdBy.firstName} ${session.createdBy.lastName}`.trim()
+  return fullName || session.createdBy.username
 }
 
 export function WorkspaceDashboardClient({
@@ -278,7 +286,7 @@ export function WorkspaceDashboardClient({
                         <td className="py-3 text-neutral-400">
                           <span className="flex items-center gap-2">
                             {theme.showAvatars && <span className="h-4 w-4 rounded-full bg-fuchsia-500" />}
-                            <span className="font-mono text-xs">{session.created_by.slice(0, 8)}</span>
+                            <span>{creatorName(session)}</span>
                           </span>
                         </td>
                         <td className="py-3 text-neutral-500">{new Date(session.created_at).toLocaleDateString()}</td>

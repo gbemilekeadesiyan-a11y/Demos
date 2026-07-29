@@ -19,7 +19,7 @@ function buildFakeSession(sessionId: string): VotingSession {
     results_visibility: 'hidden_until_close',
     start_time: null,
     end_time: null,
-    created_by: 'fake-admin',
+    createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
     created_at: new Date().toISOString(),
   }
 }

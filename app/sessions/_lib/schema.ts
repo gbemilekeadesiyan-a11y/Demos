@@ -1,3 +1,5 @@
+import type { UserSummary } from '@/app/(auth)/_lib/schema'
+
 // Placeholder until `lib/types/database.ts` is generated via
 // `supabase gen types typescript` — see demos-system-design.md § 3.
 export type VotingSession = {
@@ -13,7 +15,12 @@ export type VotingSession = {
   results_visibility: 'hidden_until_close' | 'live' | 'after_you_vote'
   start_time: string | null
   end_time: string | null
-  created_by: string
+  // Populated by a joined profiles lookup in listSessions/getSessionDetails;
+  // null for an anonymous creator (no profiles row) rather than failing the
+  // query. In practice sessions are always created by workspace admins
+  // (registered users), so this should rarely be null — but the same
+  // null-safe pattern as WorkspaceMembership.user is used for consistency.
+  createdBy: UserSummary | null
   created_at: string
 }
 
