@@ -42,6 +42,7 @@ demos-system-design.md
 - Types are generated from the database, not hand-written — run the generator after any schema change instead of manually editing type files.
 - One migration file per module, matching the module breakdown in `demos-system-design.md` Section 8, named after the feature it belongs to.
 - Auth handled via Supabase (`auth.users` + `public.profiles` split — see design doc Section 8.1). Never write to `auth.users` directly.
+- Typography: MuseoModerno (via next/font/google) for headings and large display text only. Everything else stays on the existing sans-serif. Don't re-decide this per page.
 
 ## Rules for AI changes
 - Ask before adding new dependencies.

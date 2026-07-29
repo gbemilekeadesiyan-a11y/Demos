@@ -52,9 +52,7 @@ export default function CreateWorkspacePage() {
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm">
             <Logo className="h-6 w-auto text-white" />
           </div>
-          <h1 className="font-serif text-3xl text-white">
-            <em>Create</em> your workspace
-          </h1>
+          <h1 className="font-heading text-3xl text-white">Create your workspace</h1>
           <p className="mt-3 text-sm text-neutral-400">
             Set up a space for your team to create and vote on sessions.
           </p>
