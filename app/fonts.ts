@@ -1,7 +1,10 @@
-import { MuseoModerno } from 'next/font/google'
+import { Barlow_Condensed } from 'next/font/google'
 
-export const museoModerno = MuseoModerno({
+// Clarity City (originally requested) isn't on Google Fonts, so isn't
+// loadable via next/font/google — Barlow Condensed at Black weight is the
+// closest available match for "heavy weight, condensed width" display type.
+export const headingFont = Barlow_Condensed({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+  weight: ['900'],
   variable: '--font-heading',
 })

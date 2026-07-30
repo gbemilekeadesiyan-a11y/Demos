@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { museoModerno } from './fonts'
+import { headingFont } from './fonts'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import './globals.css'
 
@@ -32,7 +32,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className={museoModerno.variable} suppressHydrationWarning>
+    <html lang="en" className={headingFont.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>

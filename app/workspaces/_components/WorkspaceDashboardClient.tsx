@@ -195,9 +195,8 @@ export function WorkspaceDashboardClient({
       <AuraBackground />
 
       <aside className="relative z-10 flex w-60 shrink-0 flex-col border-r border-divider bg-background/80 px-4 py-6">
-        <Link href="/" className="mb-8 flex items-center gap-2 px-1">
-          <Logo className="h-5 w-auto text-foreground" />
-          <span className="font-heading text-lg text-foreground">dēmos</span>
+        <Link href="/" className="mb-8 flex items-center px-1">
+          <Logo className="h-6 w-auto text-foreground" />
         </Link>
 
         <nav className="flex flex-col gap-1 text-sm">
