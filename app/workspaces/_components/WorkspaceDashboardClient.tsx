@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { AuraBackground } from '@/components/AuraBackground'
 import { Logo } from '@/components/Logo'
+import type { UserSummary } from '@/app/(auth)/_lib/schema'
 import { listSessions } from '../../sessions/_lib/actions'
 import type { VotingSession } from '../../sessions/_lib/schema'
 import type { Workspace } from '../_lib/schema'
@@ -129,16 +130,24 @@ function creatorName(session: VotingSession) {
   return fullName || session.createdBy.username
 }
 
+function currentUserDisplayName(user: UserSummary | null) {
+  if (!user) return 'Guest'
+  const fullName = `${user.firstName} ${user.lastName}`.trim()
+  return fullName || user.username
+}
+
 export function WorkspaceDashboardClient({
   workspaces,
   initialWorkspaceId,
   initialSessions,
   usingFakeSessions,
+  currentUser,
 }: {
   workspaces: Workspace[]
   initialWorkspaceId: string | null
   initialSessions: VotingSession[]
   usingFakeSessions: boolean
+  currentUser: UserSummary | null
 }) {
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(initialWorkspaceId)
   const [sessions, setSessions] = useState(initialSessions)
@@ -177,10 +186,10 @@ export function WorkspaceDashboardClient({
       <AuraBackground />
 
       <aside className="relative z-10 flex w-60 shrink-0 flex-col border-r border-neutral-900 bg-neutral-950/80 px-4 py-6">
-        <div className="mb-8 flex items-center gap-2 px-1">
+        <Link href="/" className="mb-8 flex items-center gap-2 px-1">
           <Logo className="h-5 w-auto text-white" />
           <span className="font-heading text-lg text-white">dēmos</span>
-        </div>
+        </Link>
 
         <nav className="flex flex-col gap-1 text-sm">
           <span className="rounded-lg bg-white/10 px-3 py-2 text-white">Dashboard</span>
@@ -223,6 +232,24 @@ export function WorkspaceDashboardClient({
         >
           + New Workspace
         </Link>
+
+        <div className="mt-auto border-t border-neutral-900 pt-4">
+          <div className="flex items-center gap-2 px-1 pb-2">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-700 text-xs font-medium text-white">
+              {currentUserDisplayName(currentUser).charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm text-white">{currentUserDisplayName(currentUser)}</p>
+              {currentUser && <p className="truncate text-xs text-neutral-500">@{currentUser.username}</p>}
+            </div>
+          </div>
+          <Link
+            href="/settings"
+            className="block rounded-lg px-3 py-2 text-sm text-neutral-400 transition hover:bg-white/5 hover:text-white"
+          >
+            Settings
+          </Link>
+        </div>
       </aside>
 
       <main className="relative z-10 flex-1 px-8 py-10">

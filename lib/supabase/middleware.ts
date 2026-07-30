@@ -45,17 +45,19 @@ export async function updateSession(request: NextRequest) {
 
   if (
     !user &&
+    request.nextUrl.pathname !== '/' &&
     !request.nextUrl.pathname.startsWith('/login') &&
     !request.nextUrl.pathname.startsWith('/signup') &&
     !request.nextUrl.pathname.startsWith('/auth') &&
     !isPublicSessionPath
   ) {
     // no user, potentially respond by redirecting the user to the login page.
-    // Public sessions are exempted: guest voting works via anonymous sign-in
-    // (see demos-system-design.md — "Guest voting: Allowed on public
-    // sessions"), so unauthenticated visitors there must not be bounced to
-    // /login. Everything else under /sessions (e.g. /sessions/create) stays
-    // gated.
+    // '/' is exempted (exact match, not a prefix — every other route stays
+    // gated) since it's the public landing page. Public sessions are
+    // exempted: guest voting works via anonymous sign-in (see
+    // demos-system-design.md — "Guest voting: Allowed on public sessions"),
+    // so unauthenticated visitors there must not be bounced to /login.
+    // Everything else under /sessions (e.g. /sessions/create) stays gated.
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)

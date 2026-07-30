@@ -87,3 +87,90 @@ export async function joinSessionByCode(
 ): Promise<{ success: boolean; error?: string; sessionId?: string }> {
   throw new Error('not implemented')
 }
+
+export async function updateProfile(formData: {
+  username?: string
+  firstName?: string
+  lastName?: string
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const patch: { username?: string; first_name?: string; last_name?: string } = {}
+  if (formData.username !== undefined) patch.username = formData.username
+  if (formData.firstName !== undefined) patch.first_name = formData.firstName
+  if (formData.lastName !== undefined) patch.last_name = formData.lastName
+
+  if (Object.keys(patch).length === 0) {
+    return { success: true }
+  }
+
+  // profiles.username has a unique constraint (002_profiles.sql) — a
+  // conflicting update fails as a unique_violation, not a generic error.
+  const { error } = await supabase.from('profiles').update(patch).eq('id', user.id)
+
+  if (error) {
+    if (error.code === '23505') {
+      return { success: false, error: 'That username is already taken' }
+    }
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+export async function changePassword(formData: {
+  currentPassword: string
+  newPassword: string
+}): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user || !user.email) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // Supabase's updateUser() changes the password for the current session
+  // without itself checking the old one — re-authenticate first so a
+  // stolen/left-open session can't silently change the password.
+  const { error: verifyError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: formData.currentPassword,
+  })
+
+  if (verifyError) {
+    return { success: false, error: 'Current password is incorrect' }
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: formData.newPassword })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+export async function updateEmail(newEmail: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  // Supabase sends a confirmation link to the new address rather than
+  // changing it immediately — the email only updates once that's clicked.
+  const { error } = await supabase.auth.updateUser({ email: newEmail })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}

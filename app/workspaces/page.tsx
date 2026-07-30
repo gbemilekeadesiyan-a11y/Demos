@@ -1,3 +1,5 @@
+import { createClient } from '@/lib/supabase/server'
+import type { UserSummary } from '../(auth)/_lib/schema'
 import { listMyWorkspaces } from './_lib/actions'
 import type { Workspace } from './_lib/schema'
 import { listSessions } from '../sessions/_lib/actions'
@@ -75,6 +77,30 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
 }
 
 export default async function WorkspacesPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  let currentUser: UserSummary | null = null
+
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, username, first_name, last_name')
+      .eq('id', user.id)
+      .single()
+
+    if (profile) {
+      currentUser = {
+        id: profile.id,
+        username: profile.username,
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+      }
+    }
+  }
+
   const workspacesResult = await listMyWorkspaces()
   const workspaces: Workspace[] = workspacesResult.success ? (workspacesResult.workspaces ?? []) : []
 
@@ -99,6 +125,7 @@ export default async function WorkspacesPage() {
       initialWorkspaceId={initialWorkspaceId}
       initialSessions={initialSessions}
       usingFakeSessions={usingFakeSessions}
+      currentUser={currentUser}
     />
   )
 }
