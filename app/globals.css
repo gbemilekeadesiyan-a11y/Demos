@@ -1,3 +1,55 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Semantic theme tokens. Values are space-separated RGB triples (not hex)
+ * so Tailwind's `rgb(var(--x) / <alpha-value>)` pattern can apply opacity
+ * modifiers, e.g. `bg-surface/60`. Switched by a `.dark` class on <html>,
+ * added before first paint by the inline script in app/layout.tsx — see
+ * CLAUDE.md's Conventions section for how pages should use these.
+ */
+:root {
+  --background: 255 255 255;
+  --surface: 244 244 245;
+  --surface-hover: 228 228 231;
+  --foreground: 10 10 10;
+  --muted: 82 82 91;
+  --subtle: 113 113 122;
+  /* Structural dividers (sidebar rail, table/tab rules) — subtler than
+     --border, which is for card/input outlines. */
+  --divider: 244 244 245;
+  --border: 228 228 231;
+  --border-strong: 212 212 216;
+
+  /* Light theme: orange gradient anchored at the bottom of the page. */
+  --aura-gradient: radial-gradient(ellipse 80% 60% at 50% 100%, rgba(249, 115, 22, 0.28), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 50% 85%, rgba(251, 146, 60, 0.16), transparent 70%);
+}
+
+.dark {
+  --background: 10 10 10;
+  --surface: 23 23 23;
+  --surface-hover: 38 38 38;
+  --foreground: 255 255 255;
+  --muted: 163 163 163;
+  --subtle: 115 115 115;
+  /* Restores the original (pre-token) look: dividers at neutral-900,
+     visibly subtler than the neutral-800 used for card/input borders. */
+  --divider: 23 23 23;
+  --border: 38 38 38;
+  --border-strong: 64 64 64;
+
+  /* Dark theme (current look): blue gradient anchored at the top. */
+  --aura-gradient: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(30, 58, 138, 0.45), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 50% 20%, rgba(59, 130, 246, 0.15), transparent 70%);
+}
+
+html {
+  background-color: rgb(var(--background));
+}
+
+body {
+  background-color: rgb(var(--background));
+  color: rgb(var(--foreground));
+}

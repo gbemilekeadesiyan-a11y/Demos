@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '../../../lib/supabase/server'
+import { createAdminClient } from '../../../lib/supabase/admin'
 
 export async function signUp(formData: {
   email: string
@@ -74,6 +75,18 @@ export async function signInAnonymously(): Promise<{ success: boolean; error?: s
   const supabase = await createClient()
 
   const { error } = await supabase.auth.signInAnonymously()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+export async function signOut(): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { error } = await supabase.auth.signOut()
 
   if (error) {
     return { success: false, error: error.message }
@@ -171,6 +184,48 @@ export async function updateEmail(newEmail: string): Promise<{ success: boolean;
   if (error) {
     return { success: false, error: error.message }
   }
+
+  return { success: true }
+}
+
+export async function deleteAccount(confirmation: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: profile } = await supabase.from('profiles').select('username').eq('id', user.id).single()
+
+  if (!profile) {
+    return { success: false, error: 'Could not verify your account' }
+  }
+
+  // GitHub-style confirmation — the caller must already have gated the
+  // button on this client-side, this is the server-side check that
+  // actually matters.
+  if (confirmation !== profile.username) {
+    return { success: false, error: 'Confirmation does not match your username' }
+  }
+
+  // shouldSoftDelete: true — bans the auth.users row rather than removing
+  // it, so workspaces.created_by / voting_sessions.created_by (on delete
+  // set null, see supabase/migrations/008_user_deletion_safety.sql) never
+  // actually need to fire; this account can't cascade-destroy data other
+  // people still need. Requires the service-role client — the anon-key
+  // client can't call auth.admin.*.
+  const admin = createAdminClient()
+  const { error } = await admin.auth.admin.deleteUser(user.id, true)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  await supabase.auth.signOut()
 
   return { success: true }
 }

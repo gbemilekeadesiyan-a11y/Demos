@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
 import { Logo } from '@/components/Logo'
+import { signOut } from '@/app/(auth)/_lib/actions'
 import type { UserSummary } from '@/app/(auth)/_lib/schema'
 import { listSessions } from '../../sessions/_lib/actions'
 import type { VotingSession } from '../../sessions/_lib/schema'
@@ -22,10 +24,10 @@ const THEME: Record<
   }
 > = {
   standard: {
-    tabActive: 'border-white text-white',
-    rowHover: 'hover:bg-neutral-900/60',
+    tabActive: 'border-foreground text-foreground',
+    rowHover: 'hover:bg-surface/60',
     badge: {
-      draft: 'text-neutral-400',
+      draft: 'text-muted',
       open: 'text-emerald-400',
       closed: 'text-amber-400',
       results_released: 'text-sky-400',
@@ -36,7 +38,7 @@ const THEME: Record<
     tabActive: 'border-fuchsia-400 text-fuchsia-300',
     rowHover: 'hover:bg-fuchsia-950/20',
     badge: {
-      draft: 'text-neutral-400',
+      draft: 'text-muted',
       open: 'text-fuchsia-400',
       closed: 'text-amber-300',
       results_released: 'text-emerald-300',
@@ -149,11 +151,18 @@ export function WorkspaceDashboardClient({
   usingFakeSessions: boolean
   currentUser: UserSummary | null
 }) {
+  const router = useRouter()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(initialWorkspaceId)
   const [sessions, setSessions] = useState(initialSessions)
   const [usingFake, setUsingFake] = useState(usingFakeSessions)
   const [tab, setTab] = useState<Tab>('active')
   const [loading, setLoading] = useState(false)
+
+  async function handleSignOut() {
+    await signOut()
+    router.push('/')
+    router.refresh()
+  }
 
   const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null
   const theme = THEME[selectedWorkspace?.type === 'ff' ? 'ff' : 'standard']
@@ -182,32 +191,32 @@ export function WorkspaceDashboardClient({
   })
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-neutral-950">
+    <div className="relative flex min-h-screen overflow-hidden bg-background">
       <AuraBackground />
 
-      <aside className="relative z-10 flex w-60 shrink-0 flex-col border-r border-neutral-900 bg-neutral-950/80 px-4 py-6">
+      <aside className="relative z-10 flex w-60 shrink-0 flex-col border-r border-divider bg-background/80 px-4 py-6">
         <Link href="/" className="mb-8 flex items-center gap-2 px-1">
-          <Logo className="h-5 w-auto text-white" />
-          <span className="font-heading text-lg text-white">dēmos</span>
+          <Logo className="h-5 w-auto text-foreground" />
+          <span className="font-heading text-lg text-foreground">dēmos</span>
         </Link>
 
         <nav className="flex flex-col gap-1 text-sm">
-          <span className="rounded-lg bg-white/10 px-3 py-2 text-white">Dashboard</span>
+          <span className="rounded-lg bg-foreground/10 px-3 py-2 text-foreground">Dashboard</span>
           <Link
             href={selectedWorkspaceId ? `/sessions/create?workspaceId=${selectedWorkspaceId}` : '#'}
-            className="rounded-lg px-3 py-2 text-neutral-400 transition hover:bg-white/5 hover:text-white"
+            className="rounded-lg px-3 py-2 text-muted transition hover:bg-foreground/5 hover:text-foreground"
           >
             Create a Session
           </Link>
           <Link
             href="/join"
-            className="rounded-lg px-3 py-2 text-neutral-400 transition hover:bg-white/5 hover:text-white"
+            className="rounded-lg px-3 py-2 text-muted transition hover:bg-foreground/5 hover:text-foreground"
           >
             Join by Code
           </Link>
         </nav>
 
-        <p className="mb-2 mt-8 px-3 text-xs uppercase tracking-wide text-neutral-600">Workspaces</p>
+        <p className="mb-2 mt-8 px-3 text-xs uppercase tracking-wide text-subtle">Workspaces</p>
         <div className="flex flex-col gap-1">
           {workspaces.map((workspace) => (
             <button
@@ -216,45 +225,54 @@ export function WorkspaceDashboardClient({
               onClick={() => selectWorkspace(workspace.id)}
               className={`truncate rounded-lg px-3 py-2 text-left text-sm transition ${
                 workspace.id === selectedWorkspaceId
-                  ? 'bg-white/10 text-white'
-                  : 'text-neutral-400 hover:bg-white/5 hover:text-white'
+                  ? 'bg-foreground/10 text-foreground'
+                  : 'text-muted hover:bg-foreground/5 hover:text-foreground'
               }`}
             >
               {workspace.name}
             </button>
           ))}
-          {workspaces.length === 0 && <p className="px-3 text-xs text-neutral-600">No workspaces yet.</p>}
+          {workspaces.length === 0 && <p className="px-3 text-xs text-subtle">No workspaces yet.</p>}
         </div>
 
         <Link
           href="/workspaces/create"
-          className="mt-4 rounded-lg border border-dashed border-neutral-800 px-3 py-2 text-center text-xs text-neutral-500 transition hover:border-neutral-600 hover:text-neutral-300"
+          className="mt-4 rounded-lg border border-dashed border-border px-3 py-2 text-center text-xs text-muted transition hover:border-border-strong hover:text-foreground"
         >
           + New Workspace
         </Link>
 
-        <div className="mt-auto border-t border-neutral-900 pt-4">
+        <div className="mt-auto border-t border-divider pt-4">
           <div className="flex items-center gap-2 px-1 pb-2">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-700 text-xs font-medium text-white">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-border-strong text-xs font-medium text-foreground">
               {currentUserDisplayName(currentUser).charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm text-white">{currentUserDisplayName(currentUser)}</p>
-              {currentUser && <p className="truncate text-xs text-neutral-500">@{currentUser.username}</p>}
+              <p className="truncate text-sm text-foreground">{currentUserDisplayName(currentUser)}</p>
+              {currentUser && <p className="truncate text-xs text-muted">@{currentUser.username}</p>}
             </div>
           </div>
-          <Link
-            href="/settings"
-            className="block rounded-lg px-3 py-2 text-sm text-neutral-400 transition hover:bg-white/5 hover:text-white"
-          >
-            Settings
-          </Link>
+          <div className="flex flex-col gap-1">
+            <Link
+              href="/settings"
+              className="rounded-lg px-3 py-2 text-sm text-muted transition hover:bg-foreground/5 hover:text-foreground"
+            >
+              Settings
+            </Link>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="rounded-lg px-3 py-2 text-left text-sm text-muted transition hover:bg-foreground/5 hover:text-foreground"
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </aside>
 
       <main className="relative z-10 flex-1 px-8 py-10">
         {!selectedWorkspace ? (
-          <p className="text-sm text-neutral-400">
+          <p className="text-sm text-muted">
             You&apos;re not in any workspaces yet.{' '}
             <Link href="/workspaces/create" className="underline">
               Create one
@@ -269,16 +287,16 @@ export function WorkspaceDashboardClient({
               </p>
             )}
 
-            <h1 className="font-heading text-3xl text-white">{selectedWorkspace.name}</h1>
+            <h1 className="font-heading text-3xl text-foreground">{selectedWorkspace.name}</h1>
 
-            <div className="mt-6 flex gap-6 border-b border-neutral-900 text-sm">
+            <div className="mt-6 flex gap-6 border-b border-divider text-sm">
               {(['active', 'drafts', 'history'] as Tab[]).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setTab(t)}
                   className={`border-b-2 px-1 pb-3 capitalize transition ${
-                    tab === t ? theme.tabActive : 'border-transparent text-neutral-500 hover:text-neutral-300'
+                    tab === t ? theme.tabActive : 'border-transparent text-muted hover:text-foreground'
                   }`}
                 >
                   {t}
@@ -288,13 +306,13 @@ export function WorkspaceDashboardClient({
 
             <div className="mt-4">
               {loading ? (
-                <p className="py-8 text-sm text-neutral-500">Loading…</p>
+                <p className="py-8 text-sm text-muted">Loading…</p>
               ) : filtered.length === 0 ? (
-                <p className="py-8 text-sm text-neutral-500">No sessions here yet.</p>
+                <p className="py-8 text-sm text-muted">No sessions here yet.</p>
               ) : (
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-neutral-900 text-xs uppercase tracking-wide text-neutral-600">
+                    <tr className="border-b border-divider text-xs uppercase tracking-wide text-subtle">
                       <th className="py-2 font-normal">Title</th>
                       <th className="py-2 font-normal">Status</th>
                       <th className="py-2 font-normal">Created by</th>
@@ -303,20 +321,23 @@ export function WorkspaceDashboardClient({
                   </thead>
                   <tbody>
                     {filtered.map((session) => (
-                      <tr key={session.id} className={`border-b border-neutral-900/60 ${theme.rowHover}`}>
+                      <tr key={session.id} className={`border-b border-divider/60 ${theme.rowHover}`}>
                         <td className="py-3">
-                          <Link href={`/sessions/${session.id}`} className="text-white transition hover:underline">
+                          <Link
+                            href={`/sessions/${session.id}`}
+                            className="text-foreground transition hover:underline"
+                          >
                             {session.title}
                           </Link>
                         </td>
                         <td className={`py-3 ${theme.badge[session.status]}`}>{STATUS_LABEL[session.status]}</td>
-                        <td className="py-3 text-neutral-400">
+                        <td className="py-3 text-muted">
                           <span className="flex items-center gap-2">
                             {theme.showAvatars && <span className="h-4 w-4 rounded-full bg-fuchsia-500" />}
                             <span>{creatorName(session)}</span>
                           </span>
                         </td>
-                        <td className="py-3 text-neutral-500">{new Date(session.created_at).toLocaleDateString()}</td>
+                        <td className="py-3 text-muted">{new Date(session.created_at).toLocaleDateString()}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -28,12 +28,12 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-950 px-4">
+    <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
-          <Logo className="mb-6 h-8 w-auto text-white" />
-          <h1 className="text-2xl font-semibold text-white">Welcome back</h1>
-          <p className="mt-2 text-sm text-neutral-400">Log in to dēmos to keep voting.</p>
+          <Logo className="mb-6 h-8 w-auto text-foreground" />
+          <h1 className="text-2xl font-semibold text-foreground">Welcome back</h1>
+          <p className="mt-2 text-sm text-muted">Log in to dēmos to keep voting.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-3">
@@ -43,7 +43,7 @@ export default function LoginPage() {
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
-            className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-white placeholder-neutral-500 outline-none focus:border-neutral-600"
+            className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder-muted outline-none focus:border-border-strong"
           />
           <input
             type="password"
@@ -51,7 +51,7 @@ export default function LoginPage() {
             value={form.password}
             onChange={(e) => setForm({ ...form, password: e.target.value })}
             required
-            className="rounded-lg border border-neutral-800 bg-neutral-900 px-4 py-3 text-sm text-white placeholder-neutral-500 outline-none focus:border-neutral-600"
+            className="rounded-lg border border-border bg-surface px-4 py-3 text-sm text-foreground placeholder-muted outline-none focus:border-border-strong"
           />
 
           {error && <p className="text-sm text-red-400">{error}</p>}
@@ -59,15 +59,15 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 rounded-lg bg-white px-4 py-3 text-sm font-medium text-neutral-950 transition hover:bg-neutral-200 disabled:opacity-50"
+            className="mt-2 rounded-lg bg-foreground px-4 py-3 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
           >
             {loading ? 'Logging in…' : 'Continue'}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-neutral-400">
+        <p className="mt-6 text-center text-sm text-muted">
           Don&apos;t have an account?{' '}
-          <a href="/signup" className="text-white underline">
+          <a href="/signup" className="text-foreground underline">
             Sign up
           </a>
         </p>

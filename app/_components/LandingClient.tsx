@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
 import { Logo } from '@/components/Logo'
+import { signOut } from '@/app/(auth)/_lib/actions'
+import type { UserSummary } from '@/app/(auth)/_lib/schema'
 
 function useInView<T extends HTMLElement>() {
   const ref = useRef<T | null>(null)
@@ -114,10 +117,10 @@ function SessionTypeCarousel() {
         {SESSION_TYPES.map((type) => (
           <div
             key={type.title}
-            className="w-full shrink-0 snap-center rounded-2xl border border-white/10 bg-white/5 p-8 backdrop-blur-md sm:p-10"
+            className="w-full shrink-0 snap-center rounded-2xl border border-foreground/10 bg-foreground/5 p-8 backdrop-blur-md sm:p-10"
           >
-            <h3 className="font-heading text-2xl text-white sm:text-3xl">{type.title}</h3>
-            <p className="mt-3 max-w-md text-sm text-neutral-300">{type.description}</p>
+            <h3 className="font-heading text-2xl text-foreground sm:text-3xl">{type.title}</h3>
+            <p className="mt-3 max-w-md text-sm text-muted">{type.description}</p>
           </div>
         ))}
       </div>
@@ -130,7 +133,7 @@ function SessionTypeCarousel() {
             onClick={() => scrollToIndex(index)}
             aria-label={`Go to slide ${index + 1}`}
             className={`h-1.5 rounded-full transition-all ${
-              activeIndex === index ? 'w-5 bg-white' : 'w-1.5 bg-white/30'
+              activeIndex === index ? 'w-5 bg-foreground' : 'w-1.5 bg-foreground/30'
             }`}
           />
         ))}
@@ -139,81 +142,149 @@ function SessionTypeCarousel() {
   )
 }
 
-export function LandingClient() {
+function displayName(user: UserSummary) {
+  const fullName = `${user.firstName} ${user.lastName}`.trim()
+  return fullName || user.username
+}
+
+function AccountMenu({ user }: { user: UserSummary }) {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+
+  async function handleSignOut() {
+    setOpen(false)
+    await signOut()
+    router.push('/')
+    router.refresh()
+  }
+
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-neutral-950">
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm text-foreground transition hover:bg-foreground/5"
+      >
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-border-strong text-xs font-medium">
+          {displayName(user).charAt(0).toUpperCase()}
+        </span>
+        {displayName(user)}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-40 rounded-lg border border-border bg-surface p-1 shadow-lg">
+          <Link
+            href="/settings"
+            onClick={() => setOpen(false)}
+            className="block rounded-md px-3 py-2 text-sm text-muted transition hover:bg-foreground/5 hover:text-foreground"
+          >
+            Settings
+          </Link>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="block w-full rounded-md px-3 py-2 text-left text-sm text-muted transition hover:bg-foreground/5 hover:text-foreground"
+          >
+            Log out
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function LandingClient({ currentUser }: { currentUser: UserSummary | null }) {
+  return (
+    <main className="relative min-h-screen overflow-x-hidden bg-background">
       <AuraBackground />
 
       <div className="relative">
         <header className="flex items-center justify-between px-6 py-6 sm:px-10">
           <Link href="/" className="flex items-center gap-2">
-            <Logo className="h-5 w-auto text-white" />
-            <span className="font-heading text-lg text-white">dēmos</span>
+            <Logo className="h-5 w-auto text-foreground" />
+            <span className="font-heading text-lg text-foreground">dēmos</span>
           </Link>
           <nav className="flex items-center gap-4 text-sm">
-            <Link href="/login" className="text-neutral-300 transition hover:text-white">
-              Log in
-            </Link>
-            <Link
-              href="/signup"
-              className="rounded-full bg-white px-4 py-2 font-medium text-neutral-950 transition hover:bg-neutral-200"
-            >
-              Sign up
-            </Link>
+            {currentUser ? (
+              <AccountMenu user={currentUser} />
+            ) : (
+              <>
+                <Link href="/login" className="text-muted transition hover:text-foreground">
+                  Log in
+                </Link>
+                <Link
+                  href="/signup"
+                  className="rounded-full bg-foreground px-4 py-2 font-medium text-background transition hover:opacity-90"
+                >
+                  Sign up
+                </Link>
+              </>
+            )}
           </nav>
         </header>
 
         <section className="mx-auto max-w-3xl px-6 pt-16 text-center sm:pt-24">
-          <h1 className="font-heading text-5xl text-white sm:text-6xl">dēmos</h1>
-          <p className="mt-4 font-heading text-2xl text-neutral-200 sm:text-3xl">
+          <h1 className="font-heading text-5xl text-foreground sm:text-6xl">dēmos</h1>
+          <p className="mt-4 font-heading text-2xl text-muted sm:text-3xl">
             Where consensus finds its voice
           </p>
-          <p className="mx-auto mt-5 max-w-xl text-sm text-neutral-400 sm:text-base">
+          <p className="mx-auto mt-5 max-w-xl text-sm text-muted sm:text-base">
             dēmos is a voting platform for workspaces and friend groups — create sessions, vote your
             way, and watch consensus form in real time.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/signup"
-              className="rounded-full bg-white px-6 py-3 text-sm font-medium text-neutral-950 transition hover:bg-neutral-200"
-            >
-              Sign up
-            </Link>
-            <Link
-              href="/login"
-              className="rounded-full border border-neutral-700 px-6 py-3 text-sm text-neutral-200 transition hover:border-neutral-500"
-            >
-              Log in
-            </Link>
-            <Link
-              href="/join"
-              className="rounded-full border border-neutral-700 px-6 py-3 text-sm text-neutral-200 transition hover:border-neutral-500"
-            >
-              Join by code
-            </Link>
+            {currentUser ? (
+              <Link
+                href="/workspaces"
+                className="rounded-full bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
+              >
+                Go to Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/signup"
+                  className="rounded-full bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
+                >
+                  Sign up
+                </Link>
+                <Link
+                  href="/login"
+                  className="rounded-full border border-border-strong px-6 py-3 text-sm text-muted transition hover:border-foreground/40"
+                >
+                  Log in
+                </Link>
+                <Link
+                  href="/join"
+                  className="rounded-full border border-border-strong px-6 py-3 text-sm text-muted transition hover:border-foreground/40"
+                >
+                  Join by code
+                </Link>
+              </>
+            )}
           </div>
         </section>
 
         <FadeInSection className="mx-auto mt-24 max-w-5xl px-6">
-          <h2 className="text-center font-heading text-2xl text-white sm:text-3xl">
+          <h2 className="text-center font-heading text-2xl text-foreground sm:text-3xl">
             Everything a decision needs
           </h2>
           <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {CAPABILITIES.map((capability) => (
               <div
                 key={capability.title}
-                className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md"
+                className="rounded-2xl border border-foreground/10 bg-foreground/5 p-6 backdrop-blur-md"
               >
-                <h3 className="font-heading text-lg text-white">{capability.title}</h3>
-                <p className="mt-2 text-sm text-neutral-400">{capability.description}</p>
+                <h3 className="font-heading text-lg text-foreground">{capability.title}</h3>
+                <p className="mt-2 text-sm text-muted">{capability.description}</p>
               </div>
             ))}
           </div>
         </FadeInSection>
 
         <FadeInSection className="mx-auto mt-24 max-w-3xl px-6">
-          <h2 className="text-center font-heading text-2xl text-white sm:text-3xl">
+          <h2 className="text-center font-heading text-2xl text-foreground sm:text-3xl">
             Vote the way that fits
           </h2>
           <div className="mt-8">
@@ -221,23 +292,25 @@ export function LandingClient() {
           </div>
         </FadeInSection>
 
-        <FadeInSection className="mx-auto mt-24 max-w-2xl px-6 pb-24 text-center">
-          <h2 className="font-heading text-2xl text-white sm:text-3xl">Ready to decide together?</h2>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/signup"
-              className="rounded-full bg-white px-6 py-3 text-sm font-medium text-neutral-950 transition hover:bg-neutral-200"
-            >
-              Sign up
-            </Link>
-            <Link
-              href="/join"
-              className="rounded-full border border-neutral-700 px-6 py-3 text-sm text-neutral-200 transition hover:border-neutral-500"
-            >
-              Join by code
-            </Link>
-          </div>
-        </FadeInSection>
+        {!currentUser && (
+          <FadeInSection className="mx-auto mt-24 max-w-2xl px-6 pb-24 text-center">
+            <h2 className="font-heading text-2xl text-foreground sm:text-3xl">Ready to decide together?</h2>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/signup"
+                className="rounded-full bg-foreground px-6 py-3 text-sm font-medium text-background transition hover:opacity-90"
+              >
+                Sign up
+              </Link>
+              <Link
+                href="/join"
+                className="rounded-full border border-border-strong px-6 py-3 text-sm text-muted transition hover:border-foreground/40"
+              >
+                Join by code
+              </Link>
+            </div>
+          </FadeInSection>
+        )}
       </div>
     </main>
   )

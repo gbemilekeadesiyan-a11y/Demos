@@ -29,16 +29,16 @@ export default function CreateWorkspacePage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-neutral-950 px-4">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
       <AuraBackground />
 
       <div className="relative w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
-          <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm">
-            <Logo className="h-6 w-auto text-white" />
+          <div className="mb-6 rounded-2xl border border-foreground/10 bg-foreground/5 p-3 backdrop-blur-sm">
+            <Logo className="h-6 w-auto text-foreground" />
           </div>
-          <h1 className="font-heading text-3xl text-white">Create your workspace</h1>
-          <p className="mt-3 text-sm text-neutral-400">
+          <h1 className="font-heading text-3xl text-foreground">Create your workspace</h1>
+          <p className="mt-3 text-sm text-muted">
             Set up a space for your team to create and vote on sessions.
           </p>
         </div>
@@ -50,7 +50,7 @@ export default function CreateWorkspacePage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
-            className="rounded-lg border border-neutral-800 bg-neutral-900/80 px-4 py-3 text-sm text-white placeholder-neutral-500 outline-none backdrop-blur-sm focus:border-neutral-600"
+            className="rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm text-foreground placeholder-muted outline-none backdrop-blur-sm focus:border-border-strong"
           />
 
           {error && <p className="text-sm text-red-400">{error}</p>}
@@ -58,7 +58,7 @@ export default function CreateWorkspacePage() {
           <button
             type="submit"
             disabled={loading}
-            className="mt-2 rounded-full bg-white px-4 py-3 text-sm font-medium text-neutral-950 transition hover:bg-neutral-200 disabled:opacity-50"
+            className="mt-2 rounded-full bg-foreground px-4 py-3 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
           >
             {loading ? 'Creating workspace…' : 'Create Workspace'}
           </button>

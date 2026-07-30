@@ -72,18 +72,18 @@ function JoinForm() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-neutral-950 px-4">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
       <AuraBackground />
 
       <div className="relative flex flex-col items-center text-center">
         <div className="mb-6 flex gap-1.5">
           {[0, 1, 2, 3, 4, 5].map((dot) => (
-            <span key={dot} className="h-1.5 w-1.5 rounded-full bg-neutral-600" />
+            <span key={dot} className="h-1.5 w-1.5 rounded-full bg-border-strong" />
           ))}
         </div>
 
-        <h1 className="font-heading text-3xl text-white">The Future Awaits</h1>
-        <p className="mt-2 text-sm text-neutral-400">Vote now, your choice is power.</p>
+        <h1 className="font-heading text-3xl text-foreground">The Future Awaits</h1>
+        <p className="mt-2 text-sm text-muted">Vote now, your choice is power.</p>
 
         <div className="mt-8 flex gap-2">
           {digits.map((digit, index) => (
@@ -99,7 +99,7 @@ function JoinForm() {
               disabled={loading}
               maxLength={1}
               inputMode="text"
-              className="h-14 w-12 rounded-lg border border-neutral-700 bg-neutral-900/80 text-center text-lg text-white outline-none backdrop-blur-sm focus:border-neutral-500 disabled:opacity-50"
+              className="h-14 w-12 rounded-lg border border-border-strong bg-surface/80 text-center text-lg text-foreground outline-none backdrop-blur-sm focus:border-foreground/40 disabled:opacity-50"
             />
           ))}
         </div>

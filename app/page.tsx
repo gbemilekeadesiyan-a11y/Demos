@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import type { UserSummary } from './(auth)/_lib/schema'
 import { LandingClient } from './_components/LandingClient'
 
 export default async function HomePage() {
@@ -9,11 +9,27 @@ export default async function HomePage() {
   } = await supabase.auth.getUser()
 
   // Anonymous (guest) sessions don't count as "logged in" here — they're
-  // scoped to voting on one session, not a real account, and should still
-  // see the landing page like any other visitor.
-  if (user && !user.is_anonymous) {
-    redirect('/workspaces')
+  // scoped to voting on one session, not a real account.
+  const isLoggedIn = Boolean(user && !user.is_anonymous)
+
+  let currentUser: UserSummary | null = null
+
+  if (isLoggedIn && user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username, first_name, last_name')
+      .eq('id', user.id)
+      .single()
+
+    if (profile) {
+      currentUser = {
+        id: user.id,
+        username: profile.username,
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+      }
+    }
   }
 
-  return <LandingClient />
+  return <LandingClient currentUser={currentUser} />
 }

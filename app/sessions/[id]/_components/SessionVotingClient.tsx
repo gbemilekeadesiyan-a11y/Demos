@@ -21,10 +21,10 @@ const THEME: Record<
   }
 > = {
   standard: {
-    accentSelected: 'border-white bg-white text-neutral-950',
-    accentBorder: 'border-neutral-800 hover:border-neutral-600',
-    barFill: 'bg-neutral-200',
-    cardClass: 'border-neutral-800 bg-neutral-900/80',
+    accentSelected: 'border-foreground bg-foreground text-background',
+    accentBorder: 'border-border hover:border-border-strong',
+    barFill: 'bg-foreground',
+    cardClass: 'border-border bg-surface/80',
     showAvatars: false,
     footerCopy: (count) => `${count} vote${count === 1 ? '' : 's'}`,
   },
@@ -32,7 +32,7 @@ const THEME: Record<
     accentSelected: 'border-fuchsia-400 bg-fuchsia-500 text-white',
     accentBorder: 'border-fuchsia-900/40 hover:border-fuchsia-500/60',
     barFill: 'bg-gradient-to-r from-fuchsia-500 to-amber-400',
-    cardClass: 'border-fuchsia-900/30 bg-neutral-900/60',
+    cardClass: 'border-fuchsia-900/30 bg-surface/60',
     showAvatars: true,
     footerCopy: (count) => `🎉 ${count} ${count === 1 ? 'person has' : 'people have'} weighed in`,
   },
@@ -223,7 +223,7 @@ export function SessionVotingClient({
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-neutral-950 px-4 py-12">
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 py-12">
       <AuraBackground />
 
       <div className="relative mx-auto max-w-lg">
@@ -233,17 +233,17 @@ export function SessionVotingClient({
           </p>
         )}
 
-        <h1 className="font-heading text-3xl text-white">{session.title}</h1>
-        {session.description && <p className="mt-2 text-sm text-neutral-400">{session.description}</p>}
+        <h1 className="font-heading text-3xl text-foreground">{session.title}</h1>
+        {session.description && <p className="mt-2 text-sm text-muted">{session.description}</p>}
 
         {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
 
         {session.status === 'draft' ? (
-          <p className="mt-8 text-sm text-neutral-500">This session hasn&apos;t opened yet.</p>
+          <p className="mt-8 text-sm text-muted">This session hasn&apos;t opened yet.</p>
         ) : !showResults ? (
           <div className="mt-8">
             {session.results_visibility === 'live' && (
-              <p className="mb-4 text-xs text-neutral-500">
+              <p className="mb-4 text-xs text-muted">
                 <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle" />
                 {totalVotes} vote{totalVotes === 1 ? '' : 's'} so far
               </p>
@@ -256,7 +256,7 @@ export function SessionVotingClient({
                     type="button"
                     onClick={() => setSelectedId(option.id)}
                     className={`rounded-full border px-4 py-3 text-left text-sm transition ${
-                      selectedId === option.id ? theme.accentSelected : `${theme.accentBorder} text-white`
+                      selectedId === option.id ? theme.accentSelected : `${theme.accentBorder} text-foreground`
                     }`}
                   >
                     {option.label}
@@ -270,7 +270,7 @@ export function SessionVotingClient({
                     type="button"
                     onClick={() => toggleMultiple(option.id)}
                     className={`rounded-full border px-4 py-3 text-left text-sm transition ${
-                      selectedIds.has(option.id) ? theme.accentSelected : `${theme.accentBorder} text-white`
+                      selectedIds.has(option.id) ? theme.accentSelected : `${theme.accentBorder} text-foreground`
                     }`}
                   >
                     {option.label}
@@ -290,16 +290,16 @@ export function SessionVotingClient({
                       }}
                       onDragOver={(e: DragEvent<HTMLDivElement>) => e.preventDefault()}
                       onDrop={() => handleDrop(index)}
-                      className={`flex cursor-grab items-center gap-3 rounded-lg border px-4 py-3 text-sm text-white ${theme.cardClass}`}
+                      className={`flex cursor-grab items-center gap-3 rounded-lg border px-4 py-3 text-sm text-foreground ${theme.cardClass}`}
                     >
-                      <span className="text-xs text-neutral-500">{index + 1}</span>
+                      <span className="text-xs text-muted">{index + 1}</span>
                       <span className="flex-1">{option.label}</span>
                       <div className="flex flex-col">
                         <button
                           type="button"
                           onClick={() => moveRanked(index, -1)}
                           aria-label="Move up"
-                          className="text-neutral-500 hover:text-white"
+                          className="text-muted hover:text-foreground"
                         >
                           ▲
                         </button>
@@ -307,7 +307,7 @@ export function SessionVotingClient({
                           type="button"
                           onClick={() => moveRanked(index, 1)}
                           aria-label="Move down"
-                          className="text-neutral-500 hover:text-white"
+                          className="text-muted hover:text-foreground"
                         >
                           ▼
                         </button>
@@ -321,13 +321,13 @@ export function SessionVotingClient({
               type="button"
               onClick={handleSubmitVote}
               disabled={!canSubmit || submitting}
-              className="mt-6 w-full rounded-full bg-white px-4 py-3 text-sm font-medium text-neutral-950 transition hover:bg-neutral-200 disabled:opacity-50"
+              className="mt-6 w-full rounded-full bg-foreground px-4 py-3 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
             >
               {submitting ? 'Submitting…' : 'Submit Vote'}
             </button>
           </div>
         ) : resultsLocked || suppressRankedBreakdown ? (
-          <p className="mt-8 text-sm text-neutral-400">
+          <p className="mt-8 text-sm text-muted">
             {totalVotes} vote{totalVotes === 1 ? '' : 's'}
             {resultsLocked
               ? ' · Vote to see results'
@@ -347,7 +347,7 @@ export function SessionVotingClient({
                       className={`absolute inset-y-0 left-0 ${theme.barFill} opacity-80`}
                       style={{ width: `${pct}%` }}
                     />
-                    <div className="relative flex items-center justify-between px-4 py-3 text-sm text-white">
+                    <div className="relative flex items-center justify-between px-4 py-3 text-sm text-foreground">
                       <span className="flex items-center gap-2">
                         {row.label}
                         {theme.showAvatars && (
@@ -355,7 +355,7 @@ export function SessionVotingClient({
                             {[0, 1].map((dot) => (
                               <span
                                 key={dot}
-                                className={`h-4 w-4 rounded-full border border-neutral-950 ${
+                                className={`h-4 w-4 rounded-full border border-background ${
                                   AVATAR_COLORS[(index + dot) % AVATAR_COLORS.length]
                                 }`}
                               />
@@ -363,13 +363,13 @@ export function SessionVotingClient({
                           </span>
                         )}
                       </span>
-                      <span className="text-neutral-300">{pct}%</span>
+                      <span className="text-muted">{pct}%</span>
                     </div>
                   </div>
                 )
               })}
             </div>
-            <p className="mt-4 text-xs text-neutral-500">{theme.footerCopy(totalVotes)}</p>
+            <p className="mt-4 text-xs text-muted">{theme.footerCopy(totalVotes)}</p>
           </div>
         )}
       </div>

@@ -2,11 +2,12 @@
 
 import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
-import { changePassword, updateEmail, updateProfile } from '../../(auth)/_lib/actions'
+import { changePassword, deleteAccount, updateEmail, updateProfile } from '../../(auth)/_lib/actions'
 
 const inputClass =
-  'rounded-lg border border-neutral-800 bg-neutral-900/80 px-4 py-3 text-sm text-white placeholder-neutral-500 outline-none backdrop-blur-sm focus:border-neutral-600'
+  'rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm text-foreground placeholder-muted outline-none backdrop-blur-sm focus:border-border-strong'
 
 const PASSWORD_RULES: { label: string; test: (password: string) => boolean }[] = [
   { label: 'One lowercase character', test: (password) => /[a-z]/.test(password) },
@@ -29,15 +30,15 @@ export function SettingsClient({
   lastName: string
 }) {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-neutral-950 px-4 py-12">
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 py-12">
       <AuraBackground />
 
       <div className="relative mx-auto flex max-w-lg flex-col gap-10">
         <div>
-          <Link href="/workspaces" className="text-sm text-neutral-400 transition hover:text-white">
+          <Link href="/workspaces" className="text-sm text-muted transition hover:text-foreground">
             ← Back
           </Link>
-          <h1 className="mt-4 font-heading text-3xl text-white">Settings</h1>
+          <h1 className="mt-4 font-heading text-3xl text-foreground">Settings</h1>
         </div>
 
         <ProfilePhotoSection />
@@ -48,15 +49,74 @@ export function SettingsClient({
           initialEmail={email}
         />
         <ChangePasswordSection />
+        <DeleteAccountSection username={username} />
       </div>
     </main>
   )
 }
 
+function DeleteAccountSection({ username }: { username: string }) {
+  const router = useRouter()
+  const [confirmation, setConfirmation] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const canDelete = confirmation.length > 0 && confirmation === username
+
+  async function handleDelete() {
+    setError(null)
+    if (!canDelete) return
+
+    setLoading(true)
+    const result = await deleteAccount(confirmation)
+    setLoading(false)
+
+    if (!result.success) {
+      setError(result.error ?? 'Could not delete your account')
+      return
+    }
+
+    router.push('/')
+    router.refresh()
+  }
+
+  return (
+    <section className="rounded-lg border border-red-900/50 bg-red-950/10 p-5">
+      <h2 className="text-sm font-medium text-red-400">Danger zone</h2>
+      <p className="mt-2 text-xs text-muted">
+        Deleting your account removes your profile and disables sign-in for it. Workspaces and
+        sessions you created stay intact for other members — only your own membership and votes are
+        removed. This can&apos;t be undone.
+      </p>
+
+      <label className="mt-4 block text-xs text-muted">
+        Type <span className="font-mono text-foreground">{username}</span> to confirm
+        <input
+          type="text"
+          value={confirmation}
+          onChange={(e) => setConfirmation(e.target.value)}
+          className={`${inputClass} mt-1 w-full`}
+        />
+      </label>
+
+      {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={!canDelete || loading}
+        className="mt-3 rounded-full bg-red-600 px-4 py-2 text-xs font-medium text-white transition hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        {loading ? 'Deleting…' : 'Delete my account'}
+      </button>
+    </section>
+  )
+}
+
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-5">
-      <h2 className="text-sm font-medium text-neutral-300">{title}</h2>
+    <section className="rounded-lg border border-border bg-surface/60 p-5">
+      <h2 className="text-sm font-medium text-muted">{title}</h2>
       <div className="mt-4">{children}</div>
     </section>
   )
@@ -66,18 +126,18 @@ function ProfilePhotoSection() {
   return (
     <SectionCard title="Profile photo">
       <div className="flex items-center gap-4">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-neutral-800 bg-neutral-900 text-xl text-neutral-600">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-xl text-subtle">
           ?
         </div>
         <div>
           <button
             type="button"
             disabled
-            className="cursor-not-allowed rounded-lg border border-neutral-800 px-4 py-2 text-xs text-neutral-600"
+            className="cursor-not-allowed rounded-lg border border-border px-4 py-2 text-xs text-subtle"
           >
             Upload photo
           </button>
-          <p className="mt-2 text-xs text-neutral-500">Photo uploads aren&apos;t available yet.</p>
+          <p className="mt-2 text-xs text-muted">Photo uploads aren&apos;t available yet.</p>
         </div>
       </div>
     </SectionCard>
@@ -146,7 +206,7 @@ function BasicInformationSection({
   return (
     <SectionCard title="Basic information">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <label className="text-xs text-neutral-400">
+        <label className="text-xs text-muted">
           Username
           <input
             type="text"
@@ -158,7 +218,7 @@ function BasicInformationSection({
         </label>
 
         <div className="flex gap-3">
-          <label className="flex-1 text-xs text-neutral-400">
+          <label className="flex-1 text-xs text-muted">
             First name
             <input
               type="text"
@@ -168,7 +228,7 @@ function BasicInformationSection({
               className={`${inputClass} mt-1 w-full`}
             />
           </label>
-          <label className="flex-1 text-xs text-neutral-400">
+          <label className="flex-1 text-xs text-muted">
             Last name
             <input
               type="text"
@@ -186,21 +246,21 @@ function BasicInformationSection({
         <button
           type="submit"
           disabled={loading}
-          className="mt-1 self-start rounded-full bg-white px-4 py-2 text-xs font-medium text-neutral-950 transition hover:bg-neutral-200 disabled:opacity-50"
+          className="mt-1 self-start rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50"
         >
           {loading ? 'Saving…' : 'Update'}
         </button>
       </form>
 
-      <div className="mt-6 border-t border-neutral-800 pt-4">
-        <p className="text-xs text-neutral-400">Email address</p>
-        <p className="mt-1 text-sm text-white">{initialEmail}</p>
+      <div className="mt-6 border-t border-border pt-4">
+        <p className="text-xs text-muted">Email address</p>
+        <p className="mt-1 text-sm text-foreground">{initialEmail}</p>
 
         {!changingEmail ? (
           <button
             type="button"
             onClick={() => setChangingEmail(true)}
-            className="mt-2 text-xs text-neutral-400 underline transition hover:text-white"
+            className="mt-2 text-xs text-muted underline transition hover:text-foreground"
           >
             Change your email address
           </button>
@@ -223,14 +283,14 @@ function BasicInformationSection({
               <button
                 type="submit"
                 disabled={emailLoading}
-                className="rounded-full bg-white px-4 py-2 text-xs font-medium text-neutral-950 transition hover:bg-neutral-200 disabled:opacity-50"
+                className="rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50"
               >
                 {emailLoading ? 'Sending…' : 'Update Email'}
               </button>
               <button
                 type="button"
                 onClick={() => setChangingEmail(false)}
-                className="rounded-full border border-neutral-700 px-4 py-2 text-xs text-neutral-300 transition hover:border-neutral-500"
+                className="rounded-full border border-border-strong px-4 py-2 text-xs text-muted transition hover:border-foreground/40"
               >
                 Cancel
               </button>
@@ -281,7 +341,7 @@ function ChangePasswordSection() {
   return (
     <SectionCard title="Change password">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-        <label className="text-xs text-neutral-400">
+        <label className="text-xs text-muted">
           Verify current password
           <input
             type="password"
@@ -292,7 +352,7 @@ function ChangePasswordSection() {
           />
         </label>
 
-        <label className="text-xs text-neutral-400">
+        <label className="text-xs text-muted">
           New password
           <input
             type="password"
@@ -309,16 +369,16 @@ function ChangePasswordSection() {
             return (
               <li
                 key={rule.label}
-                className={`flex items-center gap-1.5 text-xs ${met ? 'text-emerald-400' : 'text-neutral-500'}`}
+                className={`flex items-center gap-1.5 text-xs ${met ? 'text-emerald-400' : 'text-muted'}`}
               >
-                <span className={`h-1.5 w-1.5 rounded-full ${met ? 'bg-emerald-400' : 'bg-neutral-700'}`} />
+                <span className={`h-1.5 w-1.5 rounded-full ${met ? 'bg-emerald-400' : 'bg-border-strong'}`} />
                 {rule.label}
               </li>
             )
           })}
         </ul>
 
-        <label className="text-xs text-neutral-400">
+        <label className="text-xs text-muted">
           Confirm new password
           <input
             type="password"
@@ -338,7 +398,7 @@ function ChangePasswordSection() {
         <button
           type="submit"
           disabled={!canSubmit || loading}
-          className="mt-1 self-start rounded-full bg-white px-4 py-2 text-xs font-medium text-neutral-950 transition hover:bg-neutral-200 disabled:opacity-50"
+          className="mt-1 self-start rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50"
         >
           {loading ? 'Updating…' : 'Update'}
         </button>

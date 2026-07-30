@@ -94,7 +94,7 @@ export function WorkspaceDetailClient({
     : null
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-neutral-950 px-4 py-12">
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 py-12">
       <AuraBackground />
 
       <div className="relative mx-auto max-w-2xl">
@@ -104,24 +104,24 @@ export function WorkspaceDetailClient({
           </p>
         )}
 
-        <h1 className="font-heading text-3xl text-white">{workspace.name}</h1>
-        <p className="mt-1 text-sm text-neutral-400">
+        <h1 className="font-heading text-3xl text-foreground">{workspace.name}</h1>
+        <p className="mt-1 text-sm text-muted">
           {workspace.type === 'ff' ? 'F&F workspace' : 'Standard workspace'}
         </p>
 
         {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
 
         <section className="mt-8">
-          <h2 className="text-sm font-medium text-neutral-300">Members</h2>
+          <h2 className="text-sm font-medium text-muted">Members</h2>
           <ul className="mt-3 flex flex-col gap-2">
             {members.map((member) => (
               <li
                 key={member.id}
-                className="flex items-center justify-between rounded-lg border border-neutral-800 bg-neutral-900/80 px-4 py-3"
+                className="flex items-center justify-between rounded-lg border border-border bg-surface/80 px-4 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-neutral-700" />
-                  <span className="text-sm text-neutral-300">{displayName(member)}</span>
+                  <div className="h-8 w-8 rounded-full bg-border-strong" />
+                  <span className="text-sm text-muted">{displayName(member)}</span>
                 </div>
 
                 {isAdmin ? (
@@ -130,14 +130,14 @@ export function WorkspaceDetailClient({
                     onChange={(e) =>
                       handleRoleChange(member.id, e.target.value as 'admin' | 'moderator' | 'member')
                     }
-                    className="rounded-md border border-neutral-800 bg-neutral-900 px-2 py-1 text-xs text-white outline-none focus:border-neutral-600"
+                    className="rounded-md border border-border bg-surface px-2 py-1 text-xs text-foreground outline-none focus:border-border-strong"
                   >
                     <option value="admin">admin</option>
                     <option value="moderator">moderator</option>
                     <option value="member">member</option>
                   </select>
                 ) : (
-                  <span className="text-xs text-neutral-400">{member.role}</span>
+                  <span className="text-xs text-muted">{member.role}</span>
                 )}
               </li>
             ))}
@@ -146,27 +146,27 @@ export function WorkspaceDetailClient({
 
         {isAdmin && (
           <section className="mt-8">
-            <h2 className="text-sm font-medium text-neutral-300">Pending requests</h2>
+            <h2 className="text-sm font-medium text-muted">Pending requests</h2>
             {pendingRequests.length === 0 ? (
-              <p className="mt-3 text-sm text-neutral-500">No pending requests.</p>
+              <p className="mt-3 text-sm text-muted">No pending requests.</p>
             ) : (
               <ul className="mt-3 flex flex-col gap-2">
                 {pendingRequests.map((request) => (
                   <li
                     key={request.id}
-                    className="flex items-center justify-between rounded-lg border border-neutral-800 bg-neutral-900/80 px-4 py-3"
+                    className="flex items-center justify-between rounded-lg border border-border bg-surface/80 px-4 py-3"
                   >
-                    <span className="text-sm text-neutral-300">{displayName(request)}</span>
+                    <span className="text-sm text-muted">{displayName(request)}</span>
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleApprove(request.id)}
-                        className="rounded-md bg-white px-3 py-1 text-xs font-medium text-neutral-950 transition hover:bg-neutral-200"
+                        className="rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background transition hover:opacity-90"
                       >
                         Approve
                       </button>
                       <button
                         onClick={() => handleReject(request.id)}
-                        className="rounded-md border border-neutral-700 px-3 py-1 text-xs text-neutral-300 transition hover:border-neutral-500"
+                        className="rounded-md border border-border-strong px-3 py-1 text-xs text-muted transition hover:border-foreground/40"
                       >
                         Reject
                       </button>
@@ -179,15 +179,15 @@ export function WorkspaceDetailClient({
         )}
 
         {isAdmin && (
-          <section className="mt-8 rounded-lg border border-neutral-800 bg-neutral-900/60 p-4">
-            <h2 className="text-sm font-medium text-neutral-300">Share workspace</h2>
+          <section className="mt-8 rounded-lg border border-border bg-surface/60 p-4">
+            <h2 className="text-sm font-medium text-muted">Share workspace</h2>
 
-            <label className="mt-3 flex items-center gap-2 text-xs text-neutral-400">
+            <label className="mt-3 flex items-center gap-2 text-xs text-muted">
               <input
                 type="checkbox"
                 checked={requiresVerification}
                 onChange={(e) => setRequiresVerification(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-neutral-700 bg-neutral-900"
+                className="h-3.5 w-3.5 rounded border-border-strong bg-surface"
               />
               Require admin verification to join
             </label>
@@ -195,7 +195,7 @@ export function WorkspaceDetailClient({
             <button
               onClick={handleGenerateInvite}
               disabled={inviteLoading}
-              className="mt-3 rounded-full bg-white px-4 py-2 text-xs font-medium text-neutral-950 transition hover:bg-neutral-200 disabled:opacity-50"
+              className="mt-3 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50"
             >
               {inviteLoading ? 'Generating…' : 'Generate Invite Link'}
             </button>
@@ -205,11 +205,11 @@ export function WorkspaceDetailClient({
                 <input
                   readOnly
                   value={inviteLink}
-                  className="w-full rounded-lg border border-neutral-800 bg-neutral-900 px-3 py-2 text-xs text-white outline-none"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground outline-none"
                 />
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {qrSrc && (
-                  <img src={qrSrc} alt="Invite QR code" className="h-32 w-32 rounded-lg border border-neutral-800" />
+                  <img src={qrSrc} alt="Invite QR code" className="h-32 w-32 rounded-lg border border-border" />
                 )}
               </div>
             )}

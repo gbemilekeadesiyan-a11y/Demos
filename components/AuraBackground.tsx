@@ -6,10 +6,7 @@ export function AuraBackground() {
     <>
       <div
         className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(30,58,138,0.45), transparent 70%), radial-gradient(ellipse 60% 50% at 50% 20%, rgba(59,130,246,0.15), transparent 70%)',
-        }}
+        style={{ background: 'var(--aura-gradient)' }}
       />
       <div
         className="pointer-events-none absolute inset-0 opacity-[0.06] mix-blend-overlay"

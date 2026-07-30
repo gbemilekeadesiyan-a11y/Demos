@@ -32,10 +32,10 @@ function Toggle({
   hint?: string
 }) {
   return (
-    <label className="flex items-center justify-between gap-4 rounded-lg border border-neutral-800 bg-neutral-900/60 px-4 py-3">
+    <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-surface/60 px-4 py-3">
       <div>
-        <p className="text-sm text-white">{label}</p>
-        {hint && <p className="mt-0.5 text-xs text-neutral-500">{hint}</p>}
+        <p className="text-sm text-foreground">{label}</p>
+        {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
       </div>
       <span className="relative inline-flex shrink-0 cursor-pointer items-center">
         <input
@@ -44,18 +44,18 @@ function Toggle({
           onChange={(e) => onChange(e.target.checked)}
           className="peer sr-only"
         />
-        <span className="h-6 w-11 rounded-full bg-neutral-700 transition peer-checked:bg-white" />
-        <span className="absolute left-1 h-4 w-4 rounded-full bg-white transition peer-checked:translate-x-5 peer-checked:bg-neutral-950" />
+        <span className="h-6 w-11 rounded-full bg-border-strong transition peer-checked:bg-foreground" />
+        <span className="absolute left-1 h-4 w-4 rounded-full bg-background transition peer-checked:translate-x-5" />
       </span>
     </label>
   )
 }
 
 const inputClass =
-  'rounded-lg border border-neutral-800 bg-neutral-900/80 px-4 py-3 text-sm text-white placeholder-neutral-500 outline-none backdrop-blur-sm focus:border-neutral-600'
+  'rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm text-foreground placeholder-muted outline-none backdrop-blur-sm focus:border-border-strong'
 
 const selectClass =
-  'rounded-lg border border-neutral-800 bg-neutral-900/80 px-4 py-3 text-sm text-white outline-none backdrop-blur-sm focus:border-neutral-600'
+  'rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm text-foreground outline-none backdrop-blur-sm focus:border-border-strong'
 
 function CreateSessionForm() {
   const router = useRouter()
@@ -142,18 +142,18 @@ function CreateSessionForm() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-neutral-950 px-4 py-12">
+    <main className="relative min-h-screen overflow-hidden bg-background px-4 py-12">
       <AuraBackground />
 
       <div className="relative mx-auto max-w-lg">
         <button
           onClick={() => router.back()}
-          className="text-sm text-neutral-400 transition hover:text-white"
+          className="text-sm text-muted transition hover:text-foreground"
         >
           ← Back
         </button>
 
-        <h1 className="mt-4 font-heading text-3xl text-white">Create a session</h1>
+        <h1 className="mt-4 font-heading text-3xl text-foreground">Create a session</h1>
 
         <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-8">
           <div className="flex flex-col gap-3">
@@ -175,7 +175,7 @@ function CreateSessionForm() {
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-medium text-neutral-300">Vote format</p>
+            <p className="mb-2 text-sm font-medium text-muted">Vote format</p>
             <div className="flex gap-2">
               {(['single', 'multiple', 'ranked'] as VoteFormat[]).map((format) => (
                 <button
@@ -184,8 +184,8 @@ function CreateSessionForm() {
                   onClick={() => setVoteFormat(format)}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition ${
                     voteFormat === format
-                      ? 'border-white bg-white text-neutral-950'
-                      : 'border-neutral-800 bg-neutral-900/80 text-neutral-300 hover:border-neutral-600'
+                      ? 'border-foreground bg-foreground text-background'
+                      : 'border-border bg-surface/80 text-muted hover:border-border-strong'
                   }`}
                 >
                   {format}
@@ -195,10 +195,10 @@ function CreateSessionForm() {
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-medium text-neutral-300">Options</p>
+            <p className="mb-2 text-sm font-medium text-muted">Options</p>
             <div className="flex flex-col gap-3">
               {options.map((option, index) => (
-                <div key={index} className="rounded-lg border border-neutral-800 bg-neutral-900/60 p-3">
+                <div key={index} className="rounded-lg border border-border bg-surface/60 p-3">
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -212,7 +212,7 @@ function CreateSessionForm() {
                         type="button"
                         onClick={() => removeOption(index)}
                         aria-label="Remove option"
-                        className="text-neutral-500 transition hover:text-white"
+                        className="text-muted transition hover:text-foreground"
                       >
                         ✕
                       </button>
@@ -238,14 +238,14 @@ function CreateSessionForm() {
             <button
               type="button"
               onClick={addOption}
-              className="mt-3 w-full rounded-lg border border-neutral-800 bg-neutral-900/60 py-2 text-sm text-neutral-300 transition hover:border-neutral-600"
+              className="mt-3 w-full rounded-lg border border-border bg-surface/60 py-2 text-sm text-muted transition hover:border-border-strong"
             >
               + Add Another Option
             </button>
           </div>
 
           <div>
-            <p className="mb-2 text-sm font-medium text-neutral-300">Session settings</p>
+            <p className="mb-2 text-sm font-medium text-muted">Session settings</p>
             <div className="flex flex-col gap-3">
               <div className="flex gap-3">
                 <select
@@ -285,7 +285,7 @@ function CreateSessionForm() {
               />
 
               <div className="flex gap-3">
-                <label className="flex-1 text-xs text-neutral-400">
+                <label className="flex-1 text-xs text-muted">
                   Start time
                   <input
                     type="datetime-local"
@@ -294,7 +294,7 @@ function CreateSessionForm() {
                     className={`${inputClass} mt-1 w-full py-2`}
                   />
                 </label>
-                <label className="flex-1 text-xs text-neutral-400">
+                <label className="flex-1 text-xs text-muted">
                   End time
                   <input
                     type="datetime-local"
@@ -312,7 +312,7 @@ function CreateSessionForm() {
           <button
             type="submit"
             disabled={loading}
-            className="rounded-full bg-white px-4 py-3 text-sm font-medium text-neutral-950 transition hover:bg-neutral-200 disabled:opacity-50"
+            className="rounded-full bg-foreground px-4 py-3 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
           >
             {loading ? 'Creating session…' : 'Create Session'}
           </button>
