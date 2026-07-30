@@ -43,6 +43,12 @@ export async function updateSession(request: NextRequest) {
       request.nextUrl.pathname
     )
 
+  // Static marketing pages linked from the logged-out landing page header —
+  // public by nature, exact matches (not prefixes) so nothing under e.g. a
+  // future /pricing/* admin route is accidentally exempted.
+  const publicMarketingPaths = ['/product', '/use-cases', '/pricing', '/about']
+  const isPublicMarketingPath = publicMarketingPaths.includes(request.nextUrl.pathname)
+
   if (
     !user &&
     request.nextUrl.pathname !== '/' &&
@@ -50,7 +56,8 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith('/signup') &&
     !request.nextUrl.pathname.startsWith('/auth') &&
     !request.nextUrl.pathname.startsWith('/join') &&
-    !isPublicSessionPath
+    !isPublicSessionPath &&
+    !isPublicMarketingPath
   ) {
     // no user, potentially respond by redirecting the user to the login page.
     // '/' is exempted (exact match, not a prefix — every other route stays
