@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { AuraBackground } from '@/components/AuraBackground'
 import { castVote, getSessionResults } from '../../_lib/actions'
 import type { SessionOption, VotingSession } from '../../_lib/schema'
@@ -78,6 +79,46 @@ export function SessionVotingClient({
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Live results: only wired up when results_visibility is 'live' — RLS on
+  // votes/vote_selections still gates what this caller actually receives,
+  // same as a manual getSessionResults call would. See
+  // supabase/migrations/007_session_results_realtime.sql for the
+  // publication change this depends on.
+  useEffect(() => {
+    if (usingFakeData || session.results_visibility !== 'live') {
+      return
+    }
+
+    const supabase = createClient()
+
+    async function refreshResults() {
+      const result = await getSessionResults(sessionId)
+      if (result.success) {
+        setResults(result.results ?? [])
+        setTotalVotes(result.totalVotes ?? 0)
+        setResultsLocked(result.resultsLocked ?? false)
+      }
+    }
+
+    const channel = supabase
+      .channel(`session-results-${sessionId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'votes', filter: `session_id=eq.${sessionId}` },
+        refreshResults
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vote_selections', filter: `session_id=eq.${sessionId}` },
+        refreshResults
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [sessionId, session.results_visibility, usingFakeData])
+
   function toggleMultiple(optionId: string) {
     setSelectedIds((current) => {
       const next = new Set(current)
@@ -128,6 +169,12 @@ export function SessionVotingClient({
       : session.vote_format === 'multiple'
         ? selectedIds.size > 0
         : true
+
+  // Per demos-system-design.md § 8.4: never show a live IRV leaderboard —
+  // standings can flip entirely as ballots arrive and eliminations happen,
+  // which can mislead voters mid-poll. Vote count only until the session
+  // closes, regardless of resultsLocked/live settings.
+  const suppressRankedBreakdown = session.vote_format === 'ranked' && session.status === 'open'
 
   async function handleSubmitVote() {
     setError(null)
@@ -195,6 +242,12 @@ export function SessionVotingClient({
           <p className="mt-8 text-sm text-neutral-500">This session hasn&apos;t opened yet.</p>
         ) : !showResults ? (
           <div className="mt-8">
+            {session.results_visibility === 'live' && (
+              <p className="mb-4 text-xs text-neutral-500">
+                <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-red-500 align-middle" />
+                {totalVotes} vote{totalVotes === 1 ? '' : 's'} so far
+              </p>
+            )}
             <div className="flex flex-col gap-2">
               {session.vote_format === 'single' &&
                 options.map((option) => (
@@ -273,9 +326,12 @@ export function SessionVotingClient({
               {submitting ? 'Submitting…' : 'Submit Vote'}
             </button>
           </div>
-        ) : resultsLocked ? (
+        ) : resultsLocked || suppressRankedBreakdown ? (
           <p className="mt-8 text-sm text-neutral-400">
-            {totalVotes} vote{totalVotes === 1 ? '' : 's'} · Vote to see results
+            {totalVotes} vote{totalVotes === 1 ? '' : 's'}
+            {resultsLocked
+              ? ' · Vote to see results'
+              : ' · Full ranked-choice results are revealed after voting closes'}
           </p>
         ) : (
           <div className="mt-8">
