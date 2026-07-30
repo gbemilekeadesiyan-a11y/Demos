@@ -200,9 +200,8 @@ export function LandingClient({ currentUser }: { currentUser: UserSummary | null
 
       <div className="relative">
         <header className="flex items-center justify-between px-6 py-6 sm:px-10">
-          <Link href="/" className="flex items-center gap-2">
-            <Logo className="h-5 w-auto text-foreground" />
-            <span className="font-heading text-lg text-foreground">dēmos</span>
+          <Link href="/" className="flex items-center">
+            <Logo className="h-6 w-auto text-foreground" />
           </Link>
           <nav className="flex items-center gap-4 text-sm">
             {currentUser ? (
