@@ -16,17 +16,22 @@ const THEME: Record<
     accentSelected: string
     accentBorder: string
     cardClass: string
+    primaryButton: string
   }
 > = {
   standard: {
-    accentSelected: 'border-foreground bg-foreground text-background',
+    accentSelected: 'border-accent bg-accent text-accent-foreground',
     accentBorder: 'border-border hover:border-border-strong',
     cardClass: 'border-border bg-surface/80',
+    primaryButton: 'bg-accent text-accent-foreground',
   },
   ff: {
     accentSelected: 'border-fuchsia-400 bg-fuchsia-500 text-white',
     accentBorder: 'border-fuchsia-900/40 hover:border-fuchsia-500/60',
     cardClass: 'border-fuchsia-900/30 bg-surface/60',
+    // ff keeps its own bright palette (fuchsia/amber/sky) rather than the
+    // site accent — see CLAUDE.md's ff theming rules.
+    primaryButton: 'bg-fuchsia-500 text-white',
   },
 }
 
@@ -405,7 +410,7 @@ export function SessionVotingClient({
               type="button"
               onClick={handleSubmitVote}
               disabled={!canSubmit || submitting}
-              className="mt-6 w-full rounded-full bg-foreground px-4 py-3 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+              className={`mt-6 w-full rounded-full px-4 py-3 text-sm font-medium transition hover:opacity-90 disabled:opacity-50 ${theme.primaryButton}`}
             >
               {submitting ? 'Submitting…' : 'Submit Vote'}
             </button>

@@ -56,7 +56,7 @@ function Toggle({
           onChange={(e) => onChange(e.target.checked)}
           className="peer sr-only"
         />
-        <span className="h-6 w-11 rounded-full bg-border-strong transition peer-checked:bg-foreground" />
+        <span className="h-6 w-11 rounded-full bg-border-strong transition peer-checked:bg-accent" />
         <span className="absolute left-1 h-4 w-4 rounded-full bg-background transition peer-checked:translate-x-5" />
       </span>
     </label>
@@ -208,7 +208,7 @@ function CreateSessionForm() {
                   onClick={() => setVoteFormat(format)}
                   className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition ${
                     voteFormat === format
-                      ? 'border-foreground bg-foreground text-background'
+                      ? 'border-accent bg-accent text-accent-foreground'
                       : 'border-border bg-surface/80 text-muted hover:border-border-strong'
                   }`}
                 >
@@ -364,7 +364,7 @@ function CreateSessionForm() {
           <button
             type="submit"
             disabled={loading}
-            className="rounded-full bg-foreground px-4 py-3 text-sm font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+            className="rounded-full bg-accent px-4 py-3 text-sm font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
           >
             {loading ? 'Creating session…' : 'Create Session'}
           </button>

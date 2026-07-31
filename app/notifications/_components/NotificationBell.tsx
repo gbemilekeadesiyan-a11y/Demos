@@ -350,7 +350,7 @@ export function NotificationBell({
                   onClick={() => setTab(t)}
                   className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
                     tab === t
-                      ? 'bg-foreground text-background'
+                      ? 'bg-accent text-accent-foreground'
                       : 'text-muted hover:bg-foreground/5 hover:text-foreground'
                   }`}
                 >

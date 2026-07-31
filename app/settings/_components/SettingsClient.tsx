@@ -246,7 +246,7 @@ function BasicInformationSection({
         <button
           type="submit"
           disabled={loading}
-          className="mt-1 self-start rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+          className="mt-1 self-start rounded-full bg-accent px-4 py-2 text-xs font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
         >
           {loading ? 'Saving…' : 'Update'}
         </button>
@@ -283,7 +283,7 @@ function BasicInformationSection({
               <button
                 type="submit"
                 disabled={emailLoading}
-                className="rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+                className="rounded-full bg-accent px-4 py-2 text-xs font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
               >
                 {emailLoading ? 'Sending…' : 'Update Email'}
               </button>
@@ -398,7 +398,7 @@ function ChangePasswordSection() {
         <button
           type="submit"
           disabled={!canSubmit || loading}
-          className="mt-1 self-start rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+          className="mt-1 self-start rounded-full bg-accent px-4 py-2 text-xs font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
         >
           {loading ? 'Updating…' : 'Update'}
         </button>

@@ -33,7 +33,7 @@ const THEME: Record<
   }
 > = {
   standard: {
-    tabActive: 'border-foreground text-foreground',
+    tabActive: 'border-accent text-accent',
     rowHover: 'hover:bg-surface/60',
     badge: {
       draft: 'text-muted',
@@ -290,7 +290,7 @@ export function WorkspaceDashboardClient({
         </div>
 
         <nav className="flex flex-col gap-1 text-sm">
-          <span className="rounded-lg bg-foreground/10 px-3 py-2 text-foreground">Dashboard</span>
+          <span className="rounded-lg bg-accent/10 px-3 py-2 text-accent">Dashboard</span>
           <Link
             href={
               selectedWorkspaceId
@@ -318,7 +318,7 @@ export function WorkspaceDashboardClient({
               onClick={() => selectWorkspace(workspace.id)}
               className={`truncate rounded-lg px-3 py-2 text-left text-sm transition ${
                 workspace.id === selectedWorkspaceId
-                  ? 'bg-foreground/10 text-foreground'
+                  ? 'bg-accent/10 text-accent'
                   : 'text-muted hover:bg-foreground/5 hover:text-foreground'
               }`}
             >
@@ -330,7 +330,7 @@ export function WorkspaceDashboardClient({
 
         <Link
           href="/workspaces/create"
-          className="mt-4 rounded-lg border border-dashed border-border px-3 py-2 text-center text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+          className="mt-4 rounded-lg border border-dashed border-border px-3 py-2 text-center text-xs text-muted transition hover:border-accent hover:text-accent"
         >
           + New Workspace
         </Link>

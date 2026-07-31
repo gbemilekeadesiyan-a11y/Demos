@@ -22,9 +22,27 @@
   --border: 228 228 231;
   --border-strong: 212 212 216;
 
-  /* Light theme: orange gradient anchored at the bottom of the page. */
-  --aura-gradient: radial-gradient(ellipse 80% 60% at 50% 100%, rgba(249, 115, 22, 0.28), transparent 70%),
-    radial-gradient(ellipse 60% 50% at 50% 85%, rgba(251, 146, 60, 0.16), transparent 70%);
+  /* Light theme: orange, still strongest at the bottom (the original
+     anchor), but with two softer stops at the vertical midpoints so the
+     glow reads throughout a tall page's scroll instead of only at the very
+     end — AuraBackground sizes to the full page height (position: absolute
+     inset-0 on a relative ancestor), not just one viewport, so on a long
+     page like the landing page the old single-stop version was invisible
+     for most of the scroll. Still a static background-image — no scroll
+     listener, no JS, same paint cost class as before. */
+  --aura-gradient: radial-gradient(ellipse 90% 40% at 50% 100%, rgba(249, 115, 22, 0.3), transparent 70%),
+    radial-gradient(ellipse 70% 35% at 50% 66%, rgba(251, 146, 60, 0.16), transparent 70%),
+    radial-gradient(ellipse 70% 35% at 50% 33%, rgba(251, 146, 60, 0.12), transparent 70%),
+    radial-gradient(ellipse 90% 40% at 50% 0%, rgba(251, 146, 60, 0.08), transparent 70%);
+
+  /* Brand accent — orange in light mode, same hue as the aura gradient
+     above. Used for emphasis (eyebrow labels, two-tone headline spans,
+     icons, links, bullets, active states, primary CTAs). Distinct from
+     status/semantic colors (error/success/warning), which per CLAUDE.md
+     stay as literal Tailwind colors rather than tokens — this one is a
+     theme-driven brand color, not a status color, so it gets a token. */
+  --accent: 249 115 22;
+  --accent-foreground: 255 255 255;
 }
 
 .dark {
@@ -40,9 +58,16 @@
   --border: 38 38 38;
   --border-strong: 64 64 64;
 
-  /* Dark theme (current look): blue gradient anchored at the top. */
-  --aura-gradient: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(30, 58, 138, 0.45), transparent 70%),
-    radial-gradient(ellipse 60% 50% at 50% 20%, rgba(59, 130, 246, 0.15), transparent 70%);
+  /* Dark theme: blue, still strongest at the top (the original anchor), same
+     mirrored spread-down-the-page reasoning as the light gradient above. */
+  --aura-gradient: radial-gradient(ellipse 90% 40% at 50% 0%, rgba(30, 58, 138, 0.48), transparent 70%),
+    radial-gradient(ellipse 70% 35% at 50% 33%, rgba(59, 130, 246, 0.16), transparent 70%),
+    radial-gradient(ellipse 70% 35% at 50% 66%, rgba(59, 130, 246, 0.12), transparent 70%),
+    radial-gradient(ellipse 90% 40% at 50% 100%, rgba(59, 130, 246, 0.08), transparent 70%);
+
+  /* Brand accent — blue in dark mode, same hue as the aura gradient above. */
+  --accent: 59 130 246;
+  --accent-foreground: 255 255 255;
 }
 
 html {

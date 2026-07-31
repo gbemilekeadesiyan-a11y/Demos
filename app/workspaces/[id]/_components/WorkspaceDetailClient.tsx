@@ -160,7 +160,7 @@ export function WorkspaceDetailClient({
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleApprove(request.id)}
-                        className="rounded-md bg-foreground px-3 py-1 text-xs font-medium text-background transition hover:opacity-90"
+                        className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-foreground transition hover:opacity-90"
                       >
                         Approve
                       </button>
@@ -195,7 +195,7 @@ export function WorkspaceDetailClient({
             <button
               onClick={handleGenerateInvite}
               disabled={inviteLoading}
-              className="mt-3 rounded-full bg-foreground px-4 py-2 text-xs font-medium text-background transition hover:opacity-90 disabled:opacity-50"
+              className="mt-3 rounded-full bg-accent px-4 py-2 text-xs font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
             >
               {inviteLoading ? 'Generating…' : 'Generate Invite Link'}
             </button>
