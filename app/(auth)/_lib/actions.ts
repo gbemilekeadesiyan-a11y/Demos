@@ -2,6 +2,15 @@
 
 import { createClient } from '../../../lib/supabase/server'
 import { createAdminClient } from '../../../lib/supabase/admin'
+import { validateEmailFormat, validateNameFormat, validatePassword, validateUsernameFormat } from './schema'
+
+export type SignUpResult =
+  | { success: true }
+  | {
+      success: false
+      field?: 'firstName' | 'lastName' | 'username' | 'email' | 'password'
+      error: string
+    }
 
 export async function signUp(formData: {
   email: string
@@ -9,8 +18,54 @@ export async function signUp(formData: {
   lastName: string
   username: string
   password: string
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<SignUpResult> {
+  const firstNameError = validateNameFormat(formData.firstName, 'First name')
+  if (firstNameError) {
+    return { success: false, field: 'firstName', error: firstNameError }
+  }
+
+  const lastNameError = validateNameFormat(formData.lastName, 'Last name')
+  if (lastNameError) {
+    return { success: false, field: 'lastName', error: lastNameError }
+  }
+
+  const usernameFormatError = validateUsernameFormat(formData.username)
+  if (usernameFormatError) {
+    return { success: false, field: 'username', error: usernameFormatError }
+  }
+
+  const emailFormatError = validateEmailFormat(formData.email)
+  if (emailFormatError) {
+    return { success: false, field: 'email', error: emailFormatError }
+  }
+
+  const passwordError = validatePassword(formData.password, formData.username)
+  if (passwordError) {
+    return { success: false, field: 'password', error: passwordError }
+  }
+
   const supabase = await createClient()
+
+  // profiles is select-able by everyone (002_profiles.sql), so this can be
+  // queried directly rather than needing a security-definer RPC like the
+  // email lookup below (auth.users isn't exposed via the REST API).
+  const { data: existingUsername } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('username', formData.username)
+    .maybeSingle()
+
+  if (existingUsername) {
+    return { success: false, field: 'username', error: 'That username is already taken' }
+  }
+
+  const { data: emailExists, error: emailLookupError } = await supabase.rpc('email_exists', {
+    p_email: formData.email,
+  })
+
+  if (!emailLookupError && emailExists) {
+    return { success: false, field: 'email', error: 'An account with this email already exists' }
+  }
 
   // Keys here must match what handle_new_user() reads from
   // raw_user_meta_data in supabase/migrations/002_profiles.sql.
@@ -27,6 +82,9 @@ export async function signUp(formData: {
   })
 
   if (error) {
+    if (error.code === 'user_already_exists') {
+      return { success: false, field: 'email', error: 'An account with this email already exists' }
+    }
     return { success: false, error: error.message }
   }
 
