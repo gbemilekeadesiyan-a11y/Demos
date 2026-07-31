@@ -4,6 +4,8 @@ import { listMyWorkspaces } from './_lib/actions'
 import type { Workspace } from './_lib/schema'
 import { listSessions } from '../sessions/_lib/actions'
 import type { VotingSession } from '../sessions/_lib/schema'
+import { listNotifications } from '../notifications/_lib/actions'
+import type { Notification } from '../notifications/_lib/schema'
 import { WorkspaceDashboardClient } from './_components/WorkspaceDashboardClient'
 
 function buildFakeSessions(workspaceId: string): VotingSession[] {
@@ -20,6 +22,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       who_can_vote: 'all_members',
       allow_anonymous_vote: true,
       results_visibility: 'hidden_until_close',
+      results_style: null,
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
@@ -36,6 +39,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       who_can_vote: 'all_members',
       allow_anonymous_vote: false,
       results_visibility: 'hidden_until_close',
+      results_style: null,
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
@@ -52,6 +56,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       who_can_vote: 'public_link',
       allow_anonymous_vote: true,
       results_visibility: 'live',
+      results_style: null,
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-user-2', username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
@@ -68,6 +73,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       who_can_vote: 'all_members',
       allow_anonymous_vote: false,
       results_visibility: 'after_you_vote',
+      results_style: null,
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-user-3', username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
@@ -119,6 +125,14 @@ export default async function WorkspacesPage() {
     }
   }
 
+  let initialNotifications: Notification[] = []
+  if (user) {
+    const notificationsResult = await listNotifications()
+    if (notificationsResult.success) {
+      initialNotifications = notificationsResult.notifications ?? []
+    }
+  }
+
   return (
     <WorkspaceDashboardClient
       workspaces={workspaces}
@@ -126,6 +140,8 @@ export default async function WorkspacesPage() {
       initialSessions={initialSessions}
       usingFakeSessions={usingFakeSessions}
       currentUser={currentUser}
+      currentUserId={user?.id ?? null}
+      initialNotifications={initialNotifications}
     />
   )
 }

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { getSessionDetails, getSessionResults } from '../_lib/actions'
-import type { SessionOption, VotingSession } from '../_lib/schema'
+import type { RankedRound, SessionOption, VotingSession } from '../_lib/schema'
 import { SessionVotingClient } from './_components/SessionVotingClient'
 
 type ResultRow = { optionId: string; label: string; count: number }
@@ -17,6 +17,7 @@ function buildFakeSession(sessionId: string): VotingSession {
     who_can_vote: 'all_members',
     allow_anonymous_vote: true,
     results_visibility: 'hidden_until_close',
+    results_style: null,
     start_time: null,
     end_time: null,
     createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
@@ -78,6 +79,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   let results: ResultRow[] = []
   let totalVotes = 0
   let resultsLocked = true
+  let rounds: RankedRound[] = []
 
   if (showResults) {
     const resultsResult = usingFakeData
@@ -88,10 +90,14 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       results = resultsResult.results ?? []
       totalVotes = resultsResult.totalVotes ?? 0
       resultsLocked = resultsResult.resultsLocked ?? false
+      rounds = resultsResult.rounds ?? []
     } else {
       results = buildFakeResults(options)
       totalVotes = results.reduce((sum, row) => sum + row.count, 0)
       resultsLocked = false
+      // Placeholder data has no real elimination history — a single round
+      // is enough for the leaderboard to render something sensible.
+      rounds = session.vote_format === 'ranked' ? [{ roundNumber: 1, counts: results, eliminated: [] }] : []
     }
   }
 
@@ -105,6 +111,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       initialResults={results}
       initialTotalVotes={totalVotes}
       initialResultsLocked={resultsLocked}
+      initialRounds={rounds}
       workspaceType={workspaceType}
       usingFakeData={usingFakeData}
     />

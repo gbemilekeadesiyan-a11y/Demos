@@ -2,7 +2,7 @@
 
 import { createClient } from '../../../lib/supabase/server'
 import type { UserSummary } from '../../(auth)/_lib/schema'
-import type { SessionOption, VotingSession } from './schema'
+import type { RankedRound, SessionOption, VotingSession } from './schema'
 
 type ProfileRow = { id: string; username: string; first_name: string; last_name: string }
 
@@ -52,6 +52,7 @@ function toVotingSession(row: any, profiles: Map<string, UserSummary>): VotingSe
     who_can_vote: row.who_can_vote,
     allow_anonymous_vote: row.allow_anonymous_vote,
     results_visibility: row.results_visibility,
+    results_style: row.results_style,
     start_time: row.start_time,
     end_time: row.end_time,
     createdBy: profiles.get(row.created_by) ?? null,
@@ -386,6 +387,7 @@ export async function getSessionResults(sessionId: string): Promise<{
   results?: { optionId: string; label: string; count: number }[]
   totalVotes?: number
   resultsLocked?: boolean
+  rounds?: RankedRound[]
 }> {
   const supabase = await createClient()
 
@@ -449,11 +451,12 @@ export async function getSessionResults(sessionId: string): Promise<{
   const selectionRows = selections ?? []
   const totalVotes = new Set(selectionRows.map((selection) => selection.vote_id)).size
 
-  const results =
-    session.vote_format === 'ranked'
-      ? tallyRankedChoice(optionRows, selectionRows)
-      : tallySimpleChoice(optionRows, selectionRows)
+  if (session.vote_format === 'ranked') {
+    const { finalCounts, rounds } = tallyRankedChoice(optionRows, selectionRows)
+    return { success: true, results: finalCounts, totalVotes, resultsLocked: false, rounds }
+  }
 
+  const results = tallySimpleChoice(optionRows, selectionRows)
   return { success: true, results, totalVotes, resultsLocked: false }
 }
 
@@ -483,13 +486,19 @@ function tallySimpleChoice(
 //   counted for no one — standard IRV practice.
 // - A tie for lowest eliminates all tied options in the same round, rather
 //   than picking one arbitrarily.
-// Returned counts are each option's tally in the last round it was still
-// standing (0 once eliminated), since the return shape is a flat list, not
-// a round-by-round history.
+// `finalCounts` is each option's tally in the last round it was still
+// standing (0 once eliminated). `rounds` is the same loop's per-iteration
+// history — one entry per round, `eliminated` empty on the round that ended
+// the loop (majority, one option left, or a full tie) — added for the
+// results leaderboard without changing the elimination/majority logic
+// itself, which is unchanged from before this was added.
 function tallyRankedChoice(
   options: { id: string; label: string }[],
   selections: { option_id: string; rank: number | null; vote_id: string }[]
-): { optionId: string; label: string; count: number }[] {
+): {
+  finalCounts: { optionId: string; label: string; count: number }[]
+  rounds: RankedRound[]
+} {
   const ballots = new Map<string, { optionId: string; rank: number }[]>()
 
   for (const selection of selections) {
@@ -505,6 +514,19 @@ function tallyRankedChoice(
 
   const remaining = new Set(options.map((option) => option.id))
   const finalCounts = new Map(options.map((option) => [option.id, 0]))
+  const rounds: RankedRound[] = []
+
+  function recordRound(roundCounts: Map<string, number>, eliminated: string[]) {
+    rounds.push({
+      roundNumber: rounds.length + 1,
+      counts: options.map((option) => ({
+        optionId: option.id,
+        label: option.label,
+        count: roundCounts.get(option.id) ?? 0,
+      })),
+      eliminated,
+    })
+  }
 
   while (remaining.size > 0) {
     const roundCounts = new Map<string, number>()
@@ -527,6 +549,7 @@ function tallyRankedChoice(
     const hasMajority = [...roundCounts.values()].some((count) => count > majorityThreshold)
 
     if (hasMajority || remaining.size === 1) {
+      recordRound(roundCounts, [])
       break
     }
 
@@ -545,13 +568,19 @@ function tallyRankedChoice(
       for (const id of toEliminate) {
         remaining.add(id)
       }
+      recordRound(roundCounts, [])
       break
     }
+
+    recordRound(roundCounts, toEliminate)
   }
 
-  return options.map((option) => ({
-    optionId: option.id,
-    label: option.label,
-    count: finalCounts.get(option.id) ?? 0,
-  }))
+  return {
+    finalCounts: options.map((option) => ({
+      optionId: option.id,
+      label: option.label,
+      count: finalCounts.get(option.id) ?? 0,
+    })),
+    rounds,
+  }
 }

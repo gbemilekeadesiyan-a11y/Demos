@@ -9,6 +9,8 @@ import { signOut } from '@/app/(auth)/_lib/actions'
 import type { UserSummary } from '@/app/(auth)/_lib/schema'
 import { listSessions } from '../../sessions/_lib/actions'
 import type { VotingSession } from '../../sessions/_lib/schema'
+import { NotificationBell } from '../../notifications/_components/NotificationBell'
+import type { Notification } from '../../notifications/_lib/schema'
 import type { Workspace } from '../_lib/schema'
 
 type Tab = 'active' | 'drafts' | 'history'
@@ -20,7 +22,15 @@ const THEME: Record<
     tabActive: string
     rowHover: string
     badge: Record<VotingSession['status'], string>
-    showAvatars: boolean
+    // 'cards' (ff) and 'table' (standard) render the same session list data
+    // through the same component — just two branches of one JSX block below,
+    // not a forked component tree — per CLAUDE.md's "identical
+    // layout/components, only visual treatment differs" rule.
+    layout: 'table' | 'cards'
+    tabLabel: Record<Tab, string>
+    greeting: boolean
+    cardAccent: string[]
+    avatarColors: string[]
   }
 > = {
   standard: {
@@ -32,7 +42,11 @@ const THEME: Record<
       closed: 'text-amber-400',
       results_released: 'text-sky-400',
     },
-    showAvatars: false,
+    layout: 'table',
+    tabLabel: { active: 'Active', drafts: 'Drafts', history: 'History' },
+    greeting: false,
+    cardAccent: [],
+    avatarColors: [],
   },
   ff: {
     tabActive: 'border-fuchsia-400 text-fuchsia-300',
@@ -43,8 +57,24 @@ const THEME: Record<
       closed: 'text-amber-300',
       results_released: 'text-emerald-300',
     },
-    showAvatars: true,
+    layout: 'cards',
+    tabLabel: { active: 'Active Polls', drafts: 'Drafts', history: 'Past Results' },
+    greeting: true,
+    cardAccent: [
+      'from-fuchsia-500 to-violet-500',
+      'from-sky-400 to-fuchsia-500',
+      'from-amber-400 to-fuchsia-500',
+      'from-emerald-400 to-sky-500',
+    ],
+    avatarColors: ['bg-fuchsia-500', 'bg-amber-400', 'bg-emerald-400', 'bg-sky-400'],
   },
+}
+
+function greetingPhrase(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
 }
 
 const STATUS_LABEL: Record<VotingSession['status'], string> = {
@@ -68,6 +98,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       who_can_vote: 'all_members',
       allow_anonymous_vote: true,
       results_visibility: 'hidden_until_close',
+      results_style: null,
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
@@ -84,6 +115,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       who_can_vote: 'all_members',
       allow_anonymous_vote: false,
       results_visibility: 'hidden_until_close',
+      results_style: null,
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
@@ -100,6 +132,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       who_can_vote: 'public_link',
       allow_anonymous_vote: true,
       results_visibility: 'live',
+      results_style: null,
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-user-2', username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
@@ -116,6 +149,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       who_can_vote: 'all_members',
       allow_anonymous_vote: false,
       results_visibility: 'after_you_vote',
+      results_style: null,
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-user-3', username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
@@ -144,12 +178,16 @@ export function WorkspaceDashboardClient({
   initialSessions,
   usingFakeSessions,
   currentUser,
+  currentUserId,
+  initialNotifications,
 }: {
   workspaces: Workspace[]
   initialWorkspaceId: string | null
   initialSessions: VotingSession[]
   usingFakeSessions: boolean
   currentUser: UserSummary | null
+  currentUserId: string | null
+  initialNotifications: Notification[]
 }) {
   const router = useRouter()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(initialWorkspaceId)
@@ -195,14 +233,21 @@ export function WorkspaceDashboardClient({
       <AuraBackground />
 
       <aside className="relative z-10 flex w-60 shrink-0 flex-col border-r border-divider bg-background/80 px-4 py-6">
-        <Link href="/" className="mb-8 flex items-center px-1">
-          <Logo className="h-6 w-auto text-foreground" />
-        </Link>
+        <div className="mb-8 flex items-center justify-between px-1">
+          <Link href="/" className="flex items-center">
+            <Logo className="h-6 w-auto text-foreground" />
+          </Link>
+          <NotificationBell userId={currentUserId} initialNotifications={initialNotifications} />
+        </div>
 
         <nav className="flex flex-col gap-1 text-sm">
           <span className="rounded-lg bg-foreground/10 px-3 py-2 text-foreground">Dashboard</span>
           <Link
-            href={selectedWorkspaceId ? `/sessions/create?workspaceId=${selectedWorkspaceId}` : '#'}
+            href={
+              selectedWorkspaceId
+                ? `/sessions/create?workspaceId=${selectedWorkspaceId}&workspaceType=${selectedWorkspace?.type ?? 'standard'}`
+                : '#'
+            }
             className="rounded-lg px-3 py-2 text-muted transition hover:bg-foreground/5 hover:text-foreground"
           >
             Create a Session
@@ -286,6 +331,11 @@ export function WorkspaceDashboardClient({
               </p>
             )}
 
+            {theme.greeting && (
+              <p className="text-sm text-muted">
+                {greetingPhrase()}, {currentUser?.firstName?.trim() || 'there'}!
+              </p>
+            )}
             <h1 className="font-heading text-3xl text-foreground">{selectedWorkspace.name}</h1>
 
             <div className="mt-6 flex gap-6 border-b border-divider text-sm">
@@ -294,11 +344,11 @@ export function WorkspaceDashboardClient({
                   key={t}
                   type="button"
                   onClick={() => setTab(t)}
-                  className={`border-b-2 px-1 pb-3 capitalize transition ${
+                  className={`border-b-2 px-1 pb-3 transition ${
                     tab === t ? theme.tabActive : 'border-transparent text-muted hover:text-foreground'
                   }`}
                 >
-                  {t}
+                  {theme.tabLabel[t]}
                 </button>
               ))}
             </div>
@@ -308,6 +358,43 @@ export function WorkspaceDashboardClient({
                 <p className="py-8 text-sm text-muted">Loading…</p>
               ) : filtered.length === 0 ? (
                 <p className="py-8 text-sm text-muted">No sessions here yet.</p>
+              ) : theme.layout === 'cards' ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {filtered.map((session, i) => (
+                    <Link
+                      key={session.id}
+                      href={`/sessions/${session.id}`}
+                      className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl ${
+                        theme.cardAccent[i % theme.cardAccent.length]
+                      }`}
+                    >
+                      <p className="text-xs font-medium uppercase tracking-wide text-white/70">
+                        {STATUS_LABEL[session.status]}
+                      </p>
+                      <h3 className="mt-1 text-lg font-semibold leading-snug">{session.title}</h3>
+                      <p className="mt-4 text-xs text-white/70">
+                        {new Date(session.created_at).toLocaleDateString()} · {creatorName(session)}
+                      </p>
+                      {/* Decorative engagement cluster — listSessions doesn't
+                          carry per-poll viewer/voter identities, so this is a
+                          visual cue (creator initial + accent dots), not a
+                          real "who voted / who's seen it" readout. */}
+                      <div className="mt-4 flex -space-x-2">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/40 bg-white/20 text-[11px] font-semibold text-white">
+                          {creatorName(session).charAt(0).toUpperCase()}
+                        </span>
+                        {[1, 2].map((offset) => (
+                          <span
+                            key={offset}
+                            className={`h-7 w-7 rounded-full border-2 border-white/40 ${
+                              theme.avatarColors[(i + offset) % theme.avatarColors.length]
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               ) : (
                 <table className="w-full text-left text-sm">
                   <thead>
@@ -330,12 +417,7 @@ export function WorkspaceDashboardClient({
                           </Link>
                         </td>
                         <td className={`py-3 ${theme.badge[session.status]}`}>{STATUS_LABEL[session.status]}</td>
-                        <td className="py-3 text-muted">
-                          <span className="flex items-center gap-2">
-                            {theme.showAvatars && <span className="h-4 w-4 rounded-full bg-fuchsia-500" />}
-                            <span>{creatorName(session)}</span>
-                          </span>
-                        </td>
+                        <td className="py-3 text-muted">{creatorName(session)}</td>
                         <td className="py-3 text-muted">{new Date(session.created_at).toLocaleDateString()}</td>
                       </tr>
                     ))}

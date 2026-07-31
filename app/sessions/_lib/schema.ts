@@ -13,6 +13,9 @@ export type VotingSession = {
   who_can_vote: 'all_members' | 'invited_list' | 'public_link'
   allow_anonymous_vote: boolean
   results_visibility: 'hidden_until_close' | 'live' | 'after_you_vote'
+  // Overrides the vote_format-driven chart default in ResultsDisplay when
+  // set — see supabase/migrations/013_session_results_style.sql.
+  results_style: 'pie_chart' | 'bar_chart' | 'leaderboard' | null
   start_time: string | null
   end_time: string | null
   // Populated by a joined profiles lookup in listSessions/getSessionDetails;
@@ -30,4 +33,13 @@ export type SessionOption = {
   label: string
   description: string | null
   image_url: string | null
+}
+
+// One IRV elimination round, per getSessionResults' ranked-choice tally.
+// `eliminated` is empty on the final round (the one that stopped the loop,
+// whether by majority, a single option remaining, or a full tie).
+export type RankedRound = {
+  roundNumber: number
+  counts: { optionId: string; label: string; count: number }[]
+  eliminated: string[]
 }

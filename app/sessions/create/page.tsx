@@ -61,6 +61,13 @@ function CreateSessionForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const workspaceId = searchParams.get('workspaceId')
+  // Passed through from the workspace dashboard's "Create a Session" link
+  // (WorkspaceDashboardClient) purely to decide which options to show here
+  // — the actual enforcement is the enforce_ff_workspace_session_visibility
+  // trigger in supabase/migrations/011_ff_workspaces.sql, so a stale/missing
+  // param just means the form shows options the backend would reject rather
+  // than a security gap.
+  const isFf = searchParams.get('workspaceType') === 'ff'
 
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -254,7 +261,7 @@ function CreateSessionForm() {
                   className={`${selectClass} flex-1`}
                 >
                   <option value="public">Public</option>
-                  <option value="private">Private</option>
+                  {!isFf && <option value="private">Private</option>}
                 </select>
                 <select
                   value={whoCanVote}
@@ -262,7 +269,7 @@ function CreateSessionForm() {
                   className={`${selectClass} flex-1`}
                 >
                   <option value="all_members">All members</option>
-                  <option value="invited_list">Invited list</option>
+                  {!isFf && <option value="invited_list">Invited list</option>}
                   <option value="public_link">Public link</option>
                 </select>
               </div>

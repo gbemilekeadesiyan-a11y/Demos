@@ -4,7 +4,8 @@ import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AuraBackground } from '@/components/AuraBackground'
 import { castVote, getSessionResults } from '../../_lib/actions'
-import type { SessionOption, VotingSession } from '../../_lib/schema'
+import type { RankedRound, SessionOption, VotingSession } from '../../_lib/schema'
+import { ResultsDisplay } from './ResultsDisplay'
 
 type ResultRow = { optionId: string; label: string; count: number }
 type WorkspaceType = 'standard' | 'ff'
@@ -14,31 +15,65 @@ const THEME: Record<
   {
     accentSelected: string
     accentBorder: string
-    barFill: string
     cardClass: string
-    showAvatars: boolean
-    footerCopy: (count: number) => string
   }
 > = {
   standard: {
     accentSelected: 'border-foreground bg-foreground text-background',
     accentBorder: 'border-border hover:border-border-strong',
-    barFill: 'bg-foreground',
     cardClass: 'border-border bg-surface/80',
-    showAvatars: false,
-    footerCopy: (count) => `${count} vote${count === 1 ? '' : 's'}`,
   },
   ff: {
     accentSelected: 'border-fuchsia-400 bg-fuchsia-500 text-white',
     accentBorder: 'border-fuchsia-900/40 hover:border-fuchsia-500/60',
-    barFill: 'bg-gradient-to-r from-fuchsia-500 to-amber-400',
     cardClass: 'border-fuchsia-900/30 bg-surface/60',
-    showAvatars: true,
-    footerCopy: (count) => `🎉 ${count} ${count === 1 ? 'person has' : 'people have'} weighed in`,
   },
 }
 
-const AVATAR_COLORS = ['bg-fuchsia-500', 'bg-amber-400', 'bg-emerald-400', 'bg-sky-400']
+// F&F-only, larger image-forward option card — falls back to a colorful
+// gradient block when the option has no image_url. Standard workspaces
+// keep the compact pill button below; same component, same click/selection
+// behavior, only the visual treatment branches on ff.
+function FfOptionCard({
+  option,
+  selected,
+  onClick,
+}: {
+  option: SessionOption
+  selected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group relative block w-full overflow-hidden rounded-2xl border-2 text-left transition ${
+        selected ? 'border-fuchsia-400 ring-2 ring-fuchsia-400/50' : 'border-transparent hover:border-fuchsia-400/40'
+      }`}
+    >
+      {option.image_url ? (
+        <div className="relative h-40 w-full">
+          {/* eslint-disable-next-line @next/next/no-img-element -- matches the existing <img> usage in WorkspaceDetailClient's QR code, no next/image elsewhere in this codebase */}
+          <img src={option.image_url} alt="" className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+        </div>
+      ) : (
+        <div className="h-40 w-full bg-gradient-to-br from-fuchsia-500 via-violet-500 to-sky-400" />
+      )}
+      <div className="absolute inset-x-0 bottom-0 p-4">
+        <p className="text-base font-semibold text-white drop-shadow">{option.label}</p>
+        {option.description && (
+          <p className="mt-0.5 truncate text-xs text-white/80">{option.description}</p>
+        )}
+      </div>
+      {selected && (
+        <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-fuchsia-500 text-sm text-white">
+          ✓
+        </span>
+      )}
+    </button>
+  )
+}
 
 export function SessionVotingClient({
   sessionId,
@@ -49,6 +84,7 @@ export function SessionVotingClient({
   initialResults,
   initialTotalVotes,
   initialResultsLocked,
+  initialRounds,
   workspaceType,
   usingFakeData,
 }: {
@@ -60,6 +96,7 @@ export function SessionVotingClient({
   initialResults: ResultRow[]
   initialTotalVotes: number
   initialResultsLocked: boolean
+  initialRounds: RankedRound[]
   workspaceType: WorkspaceType
   usingFakeData: boolean
 }) {
@@ -70,6 +107,7 @@ export function SessionVotingClient({
   const [results, setResults] = useState(initialResults)
   const [totalVotes, setTotalVotes] = useState(initialTotalVotes)
   const [resultsLocked, setResultsLocked] = useState(initialResultsLocked)
+  const [rounds, setRounds] = useState(initialRounds)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -97,6 +135,7 @@ export function SessionVotingClient({
         setResults(result.results ?? [])
         setTotalVotes(result.totalVotes ?? 0)
         setResultsLocked(result.resultsLocked ?? false)
+        setRounds(result.rounds ?? [])
       }
     }
 
@@ -219,6 +258,7 @@ export function SessionVotingClient({
       setResults(resultsResult.results ?? [])
       setTotalVotes(resultsResult.totalVotes ?? 0)
       setResultsLocked(resultsResult.resultsLocked ?? false)
+      setRounds(resultsResult.rounds ?? [])
     }
   }
 
@@ -248,34 +288,52 @@ export function SessionVotingClient({
                 {totalVotes} vote{totalVotes === 1 ? '' : 's'} so far
               </p>
             )}
-            <div className="flex flex-col gap-2">
+            <div className={`flex flex-col ${workspaceType === 'ff' ? 'gap-3' : 'gap-2'}`}>
               {session.vote_format === 'single' &&
-                options.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setSelectedId(option.id)}
-                    className={`rounded-full border px-4 py-3 text-left text-sm transition ${
-                      selectedId === option.id ? theme.accentSelected : `${theme.accentBorder} text-foreground`
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+                options.map((option) =>
+                  workspaceType === 'ff' ? (
+                    <FfOptionCard
+                      key={option.id}
+                      option={option}
+                      selected={selectedId === option.id}
+                      onClick={() => setSelectedId(option.id)}
+                    />
+                  ) : (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => setSelectedId(option.id)}
+                      className={`rounded-full border px-4 py-3 text-left text-sm transition ${
+                        selectedId === option.id ? theme.accentSelected : `${theme.accentBorder} text-foreground`
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                )}
 
               {session.vote_format === 'multiple' &&
-                options.map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => toggleMultiple(option.id)}
-                    className={`rounded-full border px-4 py-3 text-left text-sm transition ${
-                      selectedIds.has(option.id) ? theme.accentSelected : `${theme.accentBorder} text-foreground`
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+                options.map((option) =>
+                  workspaceType === 'ff' ? (
+                    <FfOptionCard
+                      key={option.id}
+                      option={option}
+                      selected={selectedIds.has(option.id)}
+                      onClick={() => toggleMultiple(option.id)}
+                    />
+                  ) : (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => toggleMultiple(option.id)}
+                      className={`rounded-full border px-4 py-3 text-left text-sm transition ${
+                        selectedIds.has(option.id) ? theme.accentSelected : `${theme.accentBorder} text-foreground`
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                )}
 
               {session.vote_format === 'ranked' &&
                 rankedOrder.map((optionId, index) => {
@@ -293,6 +351,17 @@ export function SessionVotingClient({
                       className={`flex cursor-grab items-center gap-3 rounded-lg border px-4 py-3 text-sm text-foreground ${theme.cardClass}`}
                     >
                       <span className="text-xs text-muted">{index + 1}</span>
+                      {workspaceType === 'ff' &&
+                        (option.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- matches the existing <img> usage in WorkspaceDetailClient's QR code, no next/image elsewhere in this codebase
+                          <img
+                            src={option.image_url}
+                            alt=""
+                            className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <span className="h-10 w-10 shrink-0 rounded-lg bg-gradient-to-br from-fuchsia-500 via-violet-500 to-sky-400" />
+                        ))}
                       <span className="flex-1">{option.label}</span>
                       <div className="flex flex-col">
                         <button
@@ -326,51 +395,15 @@ export function SessionVotingClient({
               {submitting ? 'Submitting…' : 'Submit Vote'}
             </button>
           </div>
-        ) : resultsLocked || suppressRankedBreakdown ? (
-          <p className="mt-8 text-sm text-muted">
-            {totalVotes} vote{totalVotes === 1 ? '' : 's'}
-            {resultsLocked
-              ? ' · Vote to see results'
-              : ' · Full ranked-choice results are revealed after voting closes'}
-          </p>
         ) : (
-          <div className="mt-8">
-            <div className="flex flex-col gap-2">
-              {results.map((row, index) => {
-                const pct = totalVotes > 0 ? Math.round((row.count / totalVotes) * 100) : 0
-                return (
-                  <div
-                    key={row.optionId}
-                    className={`relative overflow-hidden rounded-full border ${theme.cardClass}`}
-                  >
-                    <div
-                      className={`absolute inset-y-0 left-0 ${theme.barFill} opacity-80`}
-                      style={{ width: `${pct}%` }}
-                    />
-                    <div className="relative flex items-center justify-between px-4 py-3 text-sm text-foreground">
-                      <span className="flex items-center gap-2">
-                        {row.label}
-                        {theme.showAvatars && (
-                          <span className="flex -space-x-1">
-                            {[0, 1].map((dot) => (
-                              <span
-                                key={dot}
-                                className={`h-4 w-4 rounded-full border border-background ${
-                                  AVATAR_COLORS[(index + dot) % AVATAR_COLORS.length]
-                                }`}
-                              />
-                            ))}
-                          </span>
-                        )}
-                      </span>
-                      <span className="text-muted">{pct}%</span>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            <p className="mt-4 text-xs text-muted">{theme.footerCopy(totalVotes)}</p>
-          </div>
+          <ResultsDisplay
+            session={session}
+            results={results}
+            totalVotes={totalVotes}
+            resultsLocked={resultsLocked}
+            rounds={rounds}
+            suppressRankedBreakdown={suppressRankedBreakdown}
+          />
         )}
       </div>
     </main>
