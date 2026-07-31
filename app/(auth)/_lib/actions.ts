@@ -2,13 +2,19 @@
 
 import { createClient } from '../../../lib/supabase/server'
 import { createAdminClient } from '../../../lib/supabase/admin'
-import { validateEmailFormat, validateNameFormat, validatePassword, validateUsernameFormat } from './schema'
+import {
+  validateConfirmPassword,
+  validateEmailFormat,
+  validateNameFormat,
+  validatePassword,
+  validateUsernameFormat,
+} from './schema'
 
 export type SignUpResult =
   | { success: true }
   | {
       success: false
-      field?: 'firstName' | 'lastName' | 'username' | 'email' | 'password'
+      field?: 'firstName' | 'lastName' | 'username' | 'email' | 'password' | 'confirmPassword'
       error: string
     }
 
@@ -18,6 +24,7 @@ export async function signUp(formData: {
   lastName: string
   username: string
   password: string
+  confirmPassword: string
 }): Promise<SignUpResult> {
   const firstNameError = validateNameFormat(formData.firstName, 'First name')
   if (firstNameError) {
@@ -42,6 +49,11 @@ export async function signUp(formData: {
   const passwordError = validatePassword(formData.password, formData.username)
   if (passwordError) {
     return { success: false, field: 'password', error: passwordError }
+  }
+
+  const confirmPasswordError = validateConfirmPassword(formData.password, formData.confirmPassword)
+  if (confirmPasswordError) {
+    return { success: false, field: 'confirmPassword', error: confirmPasswordError }
   }
 
   const supabase = await createClient()

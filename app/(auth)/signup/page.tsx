@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { Logo } from '@/components/Logo'
 import { signUp } from '../_lib/actions'
 import {
+  getConfirmPasswordChecklist,
   getPasswordChecklist,
   getUsernameChecklist,
   summarizeUnmet,
@@ -11,12 +12,12 @@ import {
   validateNameFormat,
 } from '../_lib/schema'
 
-type ValidatedField = 'firstName' | 'lastName' | 'username' | 'email' | 'password'
+type ValidatedField = 'firstName' | 'lastName' | 'username' | 'email' | 'password' | 'confirmPassword'
 
 // First and last name share one pop-up (anchored to the right of the last
 // name box) rather than each getting its own, so 'name' stands in for
 // either field when deciding who currently owns that pop-up.
-type PopupOwner = 'name' | 'username' | 'email' | 'password'
+type PopupOwner = 'name' | 'username' | 'email' | 'password' | 'confirmPassword'
 
 function popupOwnerFor(field: ValidatedField): PopupOwner {
   return field === 'firstName' || field === 'lastName' ? 'name' : field
@@ -28,6 +29,7 @@ type FieldErrors = {
   username?: string
   email?: string
   password?: string
+  confirmPassword?: string
   general?: string
 }
 
@@ -38,10 +40,11 @@ export default function SignupPage() {
     lastName: '',
     username: '',
     password: '',
+    confirmPassword: '',
   })
   const [loading, setLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
-  const [focusedField, setFocusedField] = useState<'username' | 'password' | null>(null)
+  const [focusedField, setFocusedField] = useState<'username' | 'password' | 'confirmPassword' | null>(null)
   // The one field (or the name group) currently allowed to show its error
   // as a floating pop-up — every other invalid field just gets a red
   // border. Set on blur/submit-failure, cleared the moment a *different*
@@ -63,6 +66,7 @@ export default function SignupPage() {
     if (field === 'lastName') return validateNameFormat(value, 'Last name')
     if (field === 'username') return summarizeUnmet(getUsernameChecklist(value))
     if (field === 'password') return summarizeUnmet(getPasswordChecklist(value, form.username))
+    if (field === 'confirmPassword') return summarizeUnmet(getConfirmPasswordChecklist(form.password, value))
     return validateEmailFormat(value)
   }
 
@@ -78,7 +82,7 @@ export default function SignupPage() {
   }
 
   function handleFocus(field: ValidatedField) {
-    if (field === 'username' || field === 'password') setFocusedField(field)
+    if (field === 'username' || field === 'password' || field === 'confirmPassword') setFocusedField(field)
     // Opening a different field/group hides the previous pop-up — it
     // keeps its red border (computed live below) but loses the message box.
     const owner = popupOwnerFor(field)
@@ -86,7 +90,7 @@ export default function SignupPage() {
   }
 
   function handleBlur(field: ValidatedField) {
-    if (field === 'username' || field === 'password') {
+    if (field === 'username' || field === 'password' || field === 'confirmPassword') {
       setFocusedField((f) => (f === field ? null : f))
     }
 
@@ -278,6 +282,39 @@ export default function SignupPage() {
             {errorPopupField === 'password' && focusedField !== 'password' && fieldErrors.password && (
               <div className="absolute left-full top-0 z-20 ml-2 w-64 rounded-lg border border-red-400/40 bg-surface p-2 text-xs text-red-400 shadow-lg">
                 {fieldErrors.password}
+              </div>
+            )}
+          </div>
+
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Confirm password"
+              value={form.confirmPassword}
+              onChange={(e) => updateField('confirmPassword', e.target.value)}
+              onFocus={() => handleFocus('confirmPassword')}
+              onBlur={() => handleBlur('confirmPassword')}
+              required
+              className={`w-full rounded-lg border bg-surface px-4 py-3 text-sm text-foreground placeholder-muted outline-none focus:border-border-strong ${borderClass('confirmPassword')}`}
+            />
+            {focusedField === 'confirmPassword' && (
+              <div className="absolute left-full top-0 z-20 ml-2 w-64 rounded-lg border border-border bg-surface p-3 text-xs shadow-lg">
+                <ul className="space-y-1">
+                  {getConfirmPasswordChecklist(form.password, form.confirmPassword).map((item) => (
+                    <li
+                      key={item.label}
+                      className={`flex items-center gap-2 ${item.met ? 'text-emerald-400' : 'text-red-400'}`}
+                    >
+                      <span aria-hidden="true">{item.met ? '✓' : '✗'}</span>
+                      <span>{item.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {errorPopupField === 'confirmPassword' && focusedField !== 'confirmPassword' && fieldErrors.confirmPassword && (
+              <div className="absolute left-full top-0 z-20 ml-2 w-64 rounded-lg border border-red-400/40 bg-surface p-2 text-xs text-red-400 shadow-lg">
+                {fieldErrors.confirmPassword}
               </div>
             )}
           </div>

@@ -109,3 +109,12 @@ export function validateNameFormat(name: string, fieldLabel: string): string | n
 export function validatePassword(password: string, username: string): string | null {
   return summarizeUnmet(getPasswordChecklist(password, username))
 }
+
+export function getConfirmPasswordChecklist(password: string, confirmPassword: string): ChecklistItem[] {
+  const matches = confirmPassword.length > 0 && confirmPassword === password
+  return [{ label: matches ? 'Passwords match' : "Passwords don't match", met: matches }]
+}
+
+export function validateConfirmPassword(password: string, confirmPassword: string): string | null {
+  return confirmPassword === password ? null : "Passwords don't match"
+}
