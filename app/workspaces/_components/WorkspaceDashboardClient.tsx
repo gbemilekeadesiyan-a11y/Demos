@@ -1,14 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
 import { Logo } from '@/components/Logo'
 import { signOut } from '@/app/(auth)/_lib/actions'
 import type { UserSummary } from '@/app/(auth)/_lib/schema'
-import { listSessions } from '../../sessions/_lib/actions'
-import type { VotingSession } from '../../sessions/_lib/schema'
+import { listSessions, listSessionVoters } from '../../sessions/_lib/actions'
+import type { SessionVoter, VotingSession } from '../../sessions/_lib/schema'
 import { NotificationBell } from '../../notifications/_components/NotificationBell'
 import type { Notification } from '../../notifications/_lib/schema'
 import type { Workspace } from '../_lib/schema'
@@ -30,7 +30,6 @@ const THEME: Record<
     tabLabel: Record<Tab, string>
     greeting: boolean
     cardAccent: string[]
-    avatarColors: string[]
   }
 > = {
   standard: {
@@ -46,7 +45,6 @@ const THEME: Record<
     tabLabel: { active: 'Active', drafts: 'Drafts', history: 'History' },
     greeting: false,
     cardAccent: [],
-    avatarColors: [],
   },
   ff: {
     tabActive: 'border-fuchsia-400 text-fuchsia-300',
@@ -66,7 +64,6 @@ const THEME: Record<
       'from-amber-400 to-fuchsia-500',
       'from-emerald-400 to-sky-500',
     ],
-    avatarColors: ['bg-fuchsia-500', 'bg-amber-400', 'bg-emerald-400', 'bg-sky-400'],
   },
 }
 
@@ -99,6 +96,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       allow_anonymous_vote: true,
       results_visibility: 'hidden_until_close',
       results_style: null,
+      ballot_secrecy: 'secret',
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
@@ -116,6 +114,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       allow_anonymous_vote: false,
       results_visibility: 'hidden_until_close',
       results_style: null,
+      ballot_secrecy: 'secret',
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
@@ -133,6 +132,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       allow_anonymous_vote: true,
       results_visibility: 'live',
       results_style: null,
+      ballot_secrecy: 'secret',
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-user-2', username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
@@ -150,6 +150,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       allow_anonymous_vote: false,
       results_visibility: 'after_you_vote',
       results_style: null,
+      ballot_secrecy: 'secret',
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-user-3', username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
@@ -170,6 +171,16 @@ function currentUserDisplayName(user: UserSummary | null) {
   if (!user) return 'Guest'
   const fullName = `${user.firstName} ${user.lastName}`.trim()
   return fullName || user.username
+}
+
+function voterName(voter: SessionVoter) {
+  if (!voter.user) return 'Anonymous'
+  const fullName = `${voter.user.firstName} ${voter.user.lastName}`.trim()
+  return fullName || voter.user.username
+}
+
+function voterInitial(voter: SessionVoter) {
+  return voterName(voter).charAt(0).toUpperCase()
 }
 
 export function WorkspaceDashboardClient({
@@ -195,6 +206,7 @@ export function WorkspaceDashboardClient({
   const [usingFake, setUsingFake] = useState(usingFakeSessions)
   const [tab, setTab] = useState<Tab>('active')
   const [loading, setLoading] = useState(false)
+  const [votersBySession, setVotersBySession] = useState<Map<string, SessionVoter[]>>(new Map())
 
   async function handleSignOut() {
     await signOut()
@@ -227,6 +239,43 @@ export function WorkspaceDashboardClient({
     if (tab === 'drafts') return session.status === 'draft'
     return session.status === 'closed' || session.status === 'results_released'
   })
+
+  const filteredIds = filtered.map((session) => session.id).join(',')
+
+  // Real participation avatars for the ff card grid — replaces the old
+  // creator-initial-plus-decorative-dots cluster. Only fetched for ff
+  // (theme.layout === 'cards'; the standard table never showed avatars) and
+  // skipped entirely for placeholder/fake sessions, whose ids don't exist
+  // in the database. Scoped to whatever's currently visible in the active
+  // tab, not every session in the workspace — still one request per visible
+  // card, but bounded to what's actually on screen.
+  useEffect(() => {
+    if (theme.layout !== 'cards' || usingFake || filtered.length === 0) {
+      setVotersBySession(new Map())
+      return
+    }
+
+    let cancelled = false
+
+    async function loadVoters() {
+      const entries = await Promise.all(
+        filtered.map(async (session) => {
+          const result = await listSessionVoters(session.id)
+          return [session.id, result.success ? (result.voters ?? []) : []] as const
+        })
+      )
+      if (!cancelled) {
+        setVotersBySession(new Map(entries))
+      }
+    }
+
+    loadVoters()
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- filteredIds is a stable proxy for filtered's contents, avoiding a re-fetch loop from the new array identity `.filter()` produces every render
+  }, [filteredIds, theme.layout, usingFake])
 
   return (
     <div className="relative flex min-h-screen overflow-hidden bg-background">
@@ -375,23 +424,39 @@ export function WorkspaceDashboardClient({
                       <p className="mt-4 text-xs text-white/70">
                         {new Date(session.created_at).toLocaleDateString()} · {creatorName(session)}
                       </p>
-                      {/* Decorative engagement cluster — listSessions doesn't
-                          carry per-poll viewer/voter identities, so this is a
-                          visual cue (creator initial + accent dots), not a
-                          real "who voted / who's seen it" readout. */}
-                      <div className="mt-4 flex -space-x-2">
-                        <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/40 bg-white/20 text-[11px] font-semibold text-white">
-                          {creatorName(session).charAt(0).toUpperCase()}
-                        </span>
-                        {[1, 2].map((offset) => (
-                          <span
-                            key={offset}
-                            className={`h-7 w-7 rounded-full border-2 border-white/40 ${
-                              theme.avatarColors[(i + offset) % theme.avatarColors.length]
-                            }`}
-                          />
-                        ))}
-                      </div>
+                      {/* Real participation from listSessionVoters — who
+                          voted, never what they chose (that's gated by
+                          ballot_secrecy on the session's own results page,
+                          not shown here at all). */}
+                      {(() => {
+                        const voters = votersBySession.get(session.id) ?? []
+                        if (voters.length === 0) return null
+                        const visible = voters.slice(0, 3)
+                        const overflow = voters.length - visible.length
+                        return (
+                          <div className="mt-4 flex items-center gap-2">
+                            <div className="flex -space-x-2">
+                              {visible.map((voter, vi) => (
+                                <span
+                                  key={voter.user?.id ?? `anon-${vi}`}
+                                  title={voterName(voter)}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/40 bg-white/20 text-[11px] font-semibold text-white"
+                                >
+                                  {voterInitial(voter)}
+                                </span>
+                              ))}
+                              {overflow > 0 && (
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white/40 bg-white/20 text-[11px] font-medium text-white">
+                                  +{overflow}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-white/70">
+                              {voters.length} voted
+                            </span>
+                          </div>
+                        )
+                      })()}
                     </Link>
                   ))}
                 </div>

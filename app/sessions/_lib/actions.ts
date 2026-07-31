@@ -2,7 +2,7 @@
 
 import { createClient } from '../../../lib/supabase/server'
 import type { UserSummary } from '../../(auth)/_lib/schema'
-import type { RankedRound, SessionOption, VotingSession } from './schema'
+import type { RankedRound, SessionOption, SessionVoter, VotingSession } from './schema'
 
 type ProfileRow = { id: string; username: string; first_name: string; last_name: string }
 
@@ -53,6 +53,7 @@ function toVotingSession(row: any, profiles: Map<string, UserSummary>): VotingSe
     allow_anonymous_vote: row.allow_anonymous_vote,
     results_visibility: row.results_visibility,
     results_style: row.results_style,
+    ballot_secrecy: row.ballot_secrecy,
     start_time: row.start_time,
     end_time: row.end_time,
     createdBy: profiles.get(row.created_by) ?? null,
@@ -70,6 +71,7 @@ export async function createVotingSession(
     whoCanVote: 'all_members' | 'invited_list' | 'public_link'
     allowAnonymousVote: boolean
     resultsVisibility: 'hidden_until_close' | 'live' | 'after_you_vote'
+    ballotSecrecy?: 'secret' | 'open'
     startTime?: string
     endTime?: string
   }
@@ -82,6 +84,18 @@ export async function createVotingSession(
 
   if (!user) {
     return { success: false, error: 'Not authenticated' }
+  }
+
+  let ballotSecrecy = formData.ballotSecrecy
+
+  if (!ballotSecrecy) {
+    // Default by workspace type, per supabase/migrations/014_ballot_secrecy.sql
+    // — secret for standard workspaces, open for ff (which already can't be
+    // private/invited_list at all — see enforce_ff_workspace_session_visibility
+    // in 011_ff_workspaces.sql). Only used when the caller doesn't pass an
+    // explicit override.
+    const { data: workspace } = await supabase.from('workspaces').select('type').eq('id', workspaceId).single()
+    ballotSecrecy = workspace?.type === 'ff' ? 'open' : 'secret'
   }
 
   // RLS requires the caller to be an active admin of workspaceId — see
@@ -97,6 +111,7 @@ export async function createVotingSession(
       who_can_vote: formData.whoCanVote,
       allow_anonymous_vote: formData.allowAnonymousVote,
       results_visibility: formData.resultsVisibility,
+      ballot_secrecy: ballotSecrecy,
       start_time: formData.startTime ?? null,
       end_time: formData.endTime ?? null,
       created_by: user.id,
@@ -393,7 +408,7 @@ export async function getSessionResults(sessionId: string): Promise<{
 
   const { data: session, error: sessionError } = await supabase
     .from('voting_sessions')
-    .select('vote_format')
+    .select('vote_format, ballot_secrecy')
     .eq('id', sessionId)
     .single()
 
@@ -438,17 +453,46 @@ export async function getSessionResults(sessionId: string): Promise<{
     return { success: false, error: optionsError.message }
   }
 
-  const { data: selections, error: selectionsError } = await supabase
-    .from('vote_selections')
-    .select('option_id, rank, vote_id')
-    .eq('session_id', sessionId)
+  let selectionRows: { option_id: string; rank: number | null; vote_id: string }[]
 
-  if (selectionsError) {
-    return { success: false, error: selectionsError.message }
+  if (session.ballot_secrecy === 'secret') {
+    // RLS no longer lets a non-admin read raw vote_selections rows for a
+    // secret session at all (see supabase/migrations/014_ballot_secrecy.sql)
+    // — a real vote_id here would be joinable against votes.user_id,
+    // reconstructing exactly who chose what. This RPC returns the same
+    // shape with vote_id swapped for a pseudonymous per-call ballot_ref, so
+    // tallyRankedChoice/tallySimpleChoice below run completely unchanged —
+    // they only ever needed *some* stable per-ballot grouping key, not the
+    // real vote_id.
+    const { data: tallyRows, error: tallyError } = await supabase.rpc('get_session_selections_for_tally', {
+      target_session_id: sessionId,
+    })
+
+    if (tallyError) {
+      return { success: false, error: tallyError.message }
+    }
+
+    selectionRows = (
+      (tallyRows ?? []) as { ballot_ref: number; option_id: string; rank: number | null }[]
+    ).map((row) => ({
+      option_id: row.option_id,
+      rank: row.rank,
+      vote_id: String(row.ballot_ref),
+    }))
+  } else {
+    const { data: selections, error: selectionsError } = await supabase
+      .from('vote_selections')
+      .select('option_id, rank, vote_id')
+      .eq('session_id', sessionId)
+
+    if (selectionsError) {
+      return { success: false, error: selectionsError.message }
+    }
+
+    selectionRows = selections ?? []
   }
 
   const optionRows = options ?? []
-  const selectionRows = selections ?? []
   const totalVotes = new Set(selectionRows.map((selection) => selection.vote_id)).size
 
   if (session.vote_format === 'ranked') {
@@ -458,6 +502,74 @@ export async function getSessionResults(sessionId: string): Promise<{
 
   const results = tallySimpleChoice(optionRows, selectionRows)
   return { success: true, results, totalVotes, resultsLocked: false }
+}
+
+// Per-voter roster: who voted and when, always (participation stays visible
+// under ballot secrecy — see supabase/migrations/014_ballot_secrecy.sql and
+// the unchanged "votes" RLS policy in 005_voting_sessions.sql). Selections
+// (what each person chose) are only fetched — and only ever joined to a
+// voter — for open-ballot sessions; for secret sessions this doesn't even
+// attempt it, regardless of caller role, matching what a non-admin's RLS
+// view would show anyway.
+export async function listSessionVoters(sessionId: string): Promise<{
+  success: boolean
+  error?: string
+  voters?: SessionVoter[]
+}> {
+  const supabase = await createClient()
+
+  const { data: session, error: sessionError } = await supabase
+    .from('voting_sessions')
+    .select('ballot_secrecy')
+    .eq('id', sessionId)
+    .single()
+
+  if (sessionError || !session) {
+    return { success: false, error: sessionError?.message ?? 'Session not found' }
+  }
+
+  const { data: votes, error: votesError } = await supabase
+    .from('votes')
+    .select('id, user_id, created_at')
+    .eq('session_id', sessionId)
+
+  if (votesError) {
+    return { success: false, error: votesError.message }
+  }
+
+  const voteRows = votes ?? []
+  const profiles = await fetchUserSummaries(
+    supabase,
+    voteRows.map((vote) => vote.user_id)
+  )
+
+  const selectionsByVoteId = new Map<string, { optionId: string; rank?: number }[]>()
+
+  if (session.ballot_secrecy === 'open') {
+    const { data: selections, error: selectionsError } = await supabase
+      .from('vote_selections')
+      .select('vote_id, option_id, rank')
+      .eq('session_id', sessionId)
+
+    if (selectionsError) {
+      return { success: false, error: selectionsError.message }
+    }
+
+    for (const selection of selections ?? []) {
+      const list = selectionsByVoteId.get(selection.vote_id) ?? []
+      list.push({ optionId: selection.option_id, rank: selection.rank ?? undefined })
+      selectionsByVoteId.set(selection.vote_id, list)
+    }
+  }
+
+  return {
+    success: true,
+    voters: voteRows.map((vote) => ({
+      user: profiles.get(vote.user_id) ?? null,
+      votedAt: vote.created_at,
+      selections: session.ballot_secrecy === 'open' ? (selectionsByVoteId.get(vote.id) ?? []) : undefined,
+    })),
+  }
 }
 
 function tallySimpleChoice(

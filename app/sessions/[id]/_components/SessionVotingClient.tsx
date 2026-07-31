@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AuraBackground } from '@/components/AuraBackground'
-import { castVote, getSessionResults } from '../../_lib/actions'
-import type { RankedRound, SessionOption, VotingSession } from '../../_lib/schema'
+import { castVote, getSessionResults, listSessionVoters } from '../../_lib/actions'
+import type { RankedRound, SessionOption, SessionVoter, VotingSession } from '../../_lib/schema'
 import { ResultsDisplay } from './ResultsDisplay'
 
 type ResultRow = { optionId: string; label: string; count: number }
@@ -85,6 +85,7 @@ export function SessionVotingClient({
   initialTotalVotes,
   initialResultsLocked,
   initialRounds,
+  initialVoters,
   workspaceType,
   usingFakeData,
 }: {
@@ -97,6 +98,7 @@ export function SessionVotingClient({
   initialTotalVotes: number
   initialResultsLocked: boolean
   initialRounds: RankedRound[]
+  initialVoters: SessionVoter[]
   workspaceType: WorkspaceType
   usingFakeData: boolean
 }) {
@@ -108,6 +110,7 @@ export function SessionVotingClient({
   const [totalVotes, setTotalVotes] = useState(initialTotalVotes)
   const [resultsLocked, setResultsLocked] = useState(initialResultsLocked)
   const [rounds, setRounds] = useState(initialRounds)
+  const [voters, setVoters] = useState(initialVoters)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -136,6 +139,13 @@ export function SessionVotingClient({
         setTotalVotes(result.totalVotes ?? 0)
         setResultsLocked(result.resultsLocked ?? false)
         setRounds(result.rounds ?? [])
+
+        if (!result.resultsLocked) {
+          const votersResult = await listSessionVoters(sessionId)
+          setVoters(votersResult.success ? (votersResult.voters ?? []) : [])
+        } else {
+          setVoters([])
+        }
       }
     }
 
@@ -259,6 +269,11 @@ export function SessionVotingClient({
       setTotalVotes(resultsResult.totalVotes ?? 0)
       setResultsLocked(resultsResult.resultsLocked ?? false)
       setRounds(resultsResult.rounds ?? [])
+
+      if (!resultsResult.resultsLocked) {
+        const votersResult = await listSessionVoters(sessionId)
+        setVoters(votersResult.success ? (votersResult.voters ?? []) : [])
+      }
     }
   }
 
@@ -402,6 +417,7 @@ export function SessionVotingClient({
             totalVotes={totalVotes}
             resultsLocked={resultsLocked}
             rounds={rounds}
+            voters={voters}
             suppressRankedBreakdown={suppressRankedBreakdown}
           />
         )}

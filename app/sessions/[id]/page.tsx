@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { getSessionDetails, getSessionResults } from '../_lib/actions'
-import type { RankedRound, SessionOption, VotingSession } from '../_lib/schema'
+import { getSessionDetails, getSessionResults, listSessionVoters } from '../_lib/actions'
+import type { RankedRound, SessionOption, SessionVoter, VotingSession } from '../_lib/schema'
 import { SessionVotingClient } from './_components/SessionVotingClient'
 
 type ResultRow = { optionId: string; label: string; count: number }
@@ -18,6 +18,7 @@ function buildFakeSession(sessionId: string): VotingSession {
     allow_anonymous_vote: true,
     results_visibility: 'hidden_until_close',
     results_style: null,
+    ballot_secrecy: 'secret',
     start_time: null,
     end_time: null,
     createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
@@ -37,6 +38,22 @@ function buildFakeOptions(sessionId: string): SessionOption[] {
 function buildFakeResults(options: SessionOption[]): ResultRow[] {
   const counts = [21, 6, 15, 3]
   return options.map((option, i) => ({ optionId: option.id, label: option.label, count: counts[i] ?? 0 }))
+}
+
+function buildFakeVoters(options: SessionOption[]): SessionVoter[] {
+  const names = [
+    { username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
+    { username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
+    { username: 'alex.kim', firstName: 'Alex', lastName: 'Kim' },
+    { username: 'priya.rao', firstName: 'Priya', lastName: 'Rao' },
+    { username: 'jordan.b', firstName: 'Jordan', lastName: 'B' },
+  ]
+  const now = new Date().toISOString()
+  return names.map((name, i) => ({
+    user: { id: `fake-voter-${i}`, ...name },
+    votedAt: now,
+    selections: options[i % options.length] ? [{ optionId: options[i % options.length].id }] : [],
+  }))
 }
 
 export default async function SessionPage({ params }: { params: Promise<{ id: string }> }) {
@@ -80,6 +97,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   let totalVotes = 0
   let resultsLocked = true
   let rounds: RankedRound[] = []
+  let voters: SessionVoter[] = []
 
   if (showResults) {
     const resultsResult = usingFakeData
@@ -99,6 +117,14 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       // is enough for the leaderboard to render something sensible.
       rounds = session.vote_format === 'ranked' ? [{ roundNumber: 1, counts: results, eliminated: [] }] : []
     }
+
+    if (!resultsLocked) {
+      const votersResult = usingFakeData
+        ? { success: false as const }
+        : await listSessionVoters(id)
+
+      voters = votersResult.success && !usingFakeData ? (votersResult.voters ?? []) : buildFakeVoters(options)
+    }
   }
 
   return (
@@ -112,6 +138,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       initialTotalVotes={totalVotes}
       initialResultsLocked={resultsLocked}
       initialRounds={rounds}
+      initialVoters={voters}
       workspaceType={workspaceType}
       usingFakeData={usingFakeData}
     />

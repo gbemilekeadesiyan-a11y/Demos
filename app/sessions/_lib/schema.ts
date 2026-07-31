@@ -16,6 +16,12 @@ export type VotingSession = {
   // Overrides the vote_format-driven chart default in ResultsDisplay when
   // set — see supabase/migrations/013_session_results_style.sql.
   results_style: 'pie_chart' | 'bar_chart' | 'leaderboard' | null
+  // secret: non-admins see aggregate counts and who participated, never who
+  // chose what. open: linkage is visible to anyone eligible to view
+  // results. Defaulted by workspace type at creation (secret for standard,
+  // open for ff) in createVotingSession; admins can override per session —
+  // see supabase/migrations/014_ballot_secrecy.sql.
+  ballot_secrecy: 'secret' | 'open'
   start_time: string | null
   end_time: string | null
   // Populated by a joined profiles lookup in listSessions/getSessionDetails;
@@ -42,4 +48,14 @@ export type RankedRound = {
   roundNumber: number
   counts: { optionId: string; label: string; count: number }[]
   eliminated: string[]
+}
+
+// Per listSessionVoters: `selections` is only ever populated for
+// ballot_secrecy = 'open' sessions — undefined (not just empty) for secret
+// ones, so callers can't accidentally treat "no selections fetched" as "this
+// person selected nothing."
+export type SessionVoter = {
+  user: UserSummary | null
+  votedAt: string
+  selections?: { optionId: string; rank?: number }[]
 }

@@ -9,6 +9,18 @@ type VoteFormat = 'single' | 'multiple' | 'ranked'
 type Visibility = 'public' | 'private'
 type WhoCanVote = 'all_members' | 'invited_list' | 'public_link'
 type ResultsVisibility = 'hidden_until_close' | 'live' | 'after_you_vote'
+type BallotSecrecy = 'secret' | 'open'
+
+const BALLOT_SECRECY_COPY: Record<BallotSecrecy, { title: string; description: string }> = {
+  secret: {
+    title: 'Secret ballot',
+    description: 'People can see that you voted, but not what you chose.',
+  },
+  open: {
+    title: 'Open ballot',
+    description: 'Everyone can see who chose what.',
+  },
+}
 
 type OptionDraft = {
   label: string
@@ -78,6 +90,10 @@ function CreateSessionForm() {
   const [whoCanVote, setWhoCanVote] = useState<WhoCanVote>('all_members')
   const [allowAnonymousVote, setAllowAnonymousVote] = useState(false)
   const [resultsVisibility, setResultsVisibility] = useState<ResultsVisibility>('hidden_until_close')
+  // Default by workspace type, per supabase/migrations/014_ballot_secrecy.sql
+  // — secret for standard workspaces, open for ff. Admins can still
+  // override either way below.
+  const [ballotSecrecy, setBallotSecrecy] = useState<BallotSecrecy>(isFf ? 'open' : 'secret')
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
 
@@ -121,6 +137,7 @@ function CreateSessionForm() {
       whoCanVote,
       allowAnonymousVote,
       resultsVisibility,
+      ballotSecrecy,
       startTime: startTime || undefined,
       endTime: endTime || undefined,
     })
@@ -249,6 +266,34 @@ function CreateSessionForm() {
             >
               + Add Another Option
             </button>
+          </div>
+
+          <div>
+            <p className="mb-2 text-sm font-medium text-muted">Ballot secrecy</p>
+            <div className="flex flex-col gap-2">
+              {(['secret', 'open'] as BallotSecrecy[]).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setBallotSecrecy(option)}
+                  className={`rounded-lg border px-4 py-3 text-left transition ${
+                    ballotSecrecy === option
+                      ? 'border-foreground bg-foreground/5'
+                      : 'border-border bg-surface/80 hover:border-border-strong'
+                  }`}
+                >
+                  <span className="block text-sm font-medium text-foreground">
+                    {BALLOT_SECRECY_COPY[option].title}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    {BALLOT_SECRECY_COPY[option].description}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-amber-500">
+              Choose carefully — this can&apos;t be changed once people start voting.
+            </p>
           </div>
 
           <div>
