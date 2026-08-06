@@ -1,4 +1,4 @@
-'use client'
+ 'use client'
 
 import { Suspense, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -15,7 +15,7 @@ function JoinForm() {
   const [digits, setDigits] = useState<string[]>(() => {
     const chars = prefill.slice(0, CODE_LENGTH).split('')
     return Array.from({ length: CODE_LENGTH }, (_, i) => chars[i] ?? '')
-  })
+  }) 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
