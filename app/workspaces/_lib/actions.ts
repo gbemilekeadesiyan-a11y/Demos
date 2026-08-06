@@ -3,7 +3,7 @@
 import { randomBytes } from 'crypto'
 import { createClient } from '../../../lib/supabase/server'
 import type { UserSummary } from '../../(auth)/_lib/schema'
-import type { Workspace, WorkspaceMembership } from './schema'
+import type { Workspace, WorkspaceMembership, WorkspaceSessionSummary, WorkspaceStats } from './schema'
 
 type ProfileRow = { id: string; username: string; first_name: string; last_name: string }
 
@@ -185,7 +185,7 @@ export async function updateMemberRole(
   return { success: true }
 }
 
-export async function listMyWorkspaces(): Promise<{
+export async function listMyWorkspaces(surface: 'ff' | 'workspaces'): Promise<{
   success: boolean
   error?: string
   workspaces?: Workspace[]
@@ -200,11 +200,20 @@ export async function listMyWorkspaces(): Promise<{
     return { success: false, error: 'Not authenticated' }
   }
 
+  // 'workspaces' surface maps to the 'standard' workspaces.type value
+  // (003_workspaces.sql) — F&F groups are still workspaces rows, just
+  // type = 'ff', so surface filtering is which type this listing wants,
+  // not a separate table. `!inner` makes the .eq() below actually filter
+  // out non-matching rows rather than just leaving their embedded
+  // workspaces object null.
+  const workspaceType = surface === 'ff' ? 'ff' : 'standard'
+
   const { data, error } = await supabase
     .from('workspace_memberships')
-    .select('workspaces (id, name, type, created_by, settings)')
+    .select('workspaces!inner (id, name, type, created_by, settings)')
     .eq('user_id', user.id)
     .eq('status', 'active')
+    .eq('workspaces.type', workspaceType)
 
   if (error) {
     return { success: false, error: error.message }
@@ -236,6 +245,56 @@ export async function listMyWorkspaces(): Promise<{
   }))
 
   return { success: true, workspaces }
+}
+
+export async function getWorkspaceStats(
+  workspaceId: string
+): Promise<{ success: boolean; error?: string; stats?: WorkspaceStats }> {
+  const supabase = await createClient()
+
+  // Aggregated server-side in one query — see get_workspace_stats in
+  // supabase/migrations/016_workspace_stats.sql. Admin-gated there (not
+  // just by RLS), since turnout/vote totals span sessions — invited_list
+  // ones especially — a non-admin caller may have no access to at all.
+  const { data, error } = await supabase.rpc('get_workspace_stats', { p_workspace_id: workspaceId })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  const result = data as { success: boolean; error?: string; stats?: WorkspaceStats }
+
+  if (!result.success) {
+    return { success: false, error: result.error ?? 'Could not load workspace stats' }
+  }
+
+  return { success: true, stats: result.stats }
+}
+
+export async function getWorkspaceSessionSummaries(workspaceId: string): Promise<{
+  success: boolean
+  error?: string
+  sessions?: WorkspaceSessionSummary[]
+}> {
+  const supabase = await createClient()
+
+  // Same single-query aggregation and admin gate as getWorkspaceStats — see
+  // get_workspace_session_summaries in supabase/migrations/016_workspace_stats.sql.
+  const { data, error } = await supabase.rpc('get_workspace_session_summaries', {
+    p_workspace_id: workspaceId,
+  })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  const result = data as { success: boolean; error?: string; sessions?: WorkspaceSessionSummary[] }
+
+  if (!result.success) {
+    return { success: false, error: result.error ?? 'Could not load sessions' }
+  }
+
+  return { success: true, sessions: result.sessions ?? [] }
 }
 
 export async function getWorkspaceDetails(workspaceId: string): Promise<{

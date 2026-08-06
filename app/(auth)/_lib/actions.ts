@@ -1,5 +1,6 @@
 'use server'
 
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '../../../lib/supabase/server'
 import { createAdminClient } from '../../../lib/supabase/admin'
 import {
@@ -14,7 +15,7 @@ export type SignUpResult =
   | { success: true }
   | {
       success: false
-      field?: 'firstName' | 'lastName' | 'username' | 'email' | 'password' | 'confirmPassword'
+      field?: 'firstName' | 'lastName' | 'username' | 'email' | 'password' | 'confirmPassword' | 'surfaces'
       error: string
     }
 
@@ -25,6 +26,7 @@ export async function signUp(formData: {
   username: string
   password: string
   confirmPassword: string
+  surfaces: { ff: boolean; workspaces: boolean }
 }): Promise<SignUpResult> {
   const firstNameError = validateNameFormat(formData.firstName, 'First name')
   if (firstNameError) {
@@ -56,6 +58,10 @@ export async function signUp(formData: {
     return { success: false, field: 'confirmPassword', error: confirmPasswordError }
   }
 
+  if (!formData.surfaces.ff && !formData.surfaces.workspaces) {
+    return { success: false, field: 'surfaces', error: 'Select at least one surface to sign up for' }
+  }
+
   const supabase = await createClient()
 
   // profiles is select-able by everyone (002_profiles.sql), so this can be
@@ -80,7 +86,8 @@ export async function signUp(formData: {
   }
 
   // Keys here must match what handle_new_user() reads from
-  // raw_user_meta_data in supabase/migrations/002_profiles.sql.
+  // raw_user_meta_data in supabase/migrations/002_profiles.sql and
+  // 015_surface_access.sql.
   const { error } = await supabase.auth.signUp({
     email: formData.email,
     password: formData.password,
@@ -89,6 +96,8 @@ export async function signUp(formData: {
         first_name: formData.firstName,
         last_name: formData.lastName,
         username: formData.username,
+        has_ff: formData.surfaces.ff,
+        has_workspaces: formData.surfaces.workspaces,
       },
     },
   })
@@ -204,6 +213,69 @@ export async function updateProfile(formData: {
       return { success: false, error: 'That username is already taken' }
     }
     return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+export async function getSurfaceAccess(): Promise<{
+  success: boolean
+  error?: string
+  hasFf?: boolean
+  hasWorkspaces?: boolean
+}> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('has_ff, has_workspaces')
+    .eq('id', user.id)
+    .single()
+
+  if (error || !profile) {
+    return { success: false, error: error?.message ?? 'Could not load surface access' }
+  }
+
+  return { success: true, hasFf: profile.has_ff, hasWorkspaces: profile.has_workspaces }
+}
+
+export async function verifyPasswordForSwitch(password: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user || !user.email) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // A throwaway client with persistSession/autoRefreshToken off and no
+  // cookie wiring — signInWithPassword() on it only checks the credential.
+  // Unlike calling it on the cookie-backed server client (see
+  // changePassword() below, which relies on exactly that side effect), it
+  // never touches the caller's actual session cookies.
+  const verifier = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  )
+
+  const { error } = await verifier.auth.signInWithPassword({
+    email: user.email,
+    password,
+  })
+
+  if (error) {
+    return { success: false, error: 'Incorrect password' }
   }
 
   return { success: true }

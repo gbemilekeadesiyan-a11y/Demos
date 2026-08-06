@@ -30,6 +30,7 @@ type FieldErrors = {
   email?: string
   password?: string
   confirmPassword?: string
+  surfaces?: string
   general?: string
 }
 
@@ -42,6 +43,7 @@ export default function SignupPage() {
     password: '',
     confirmPassword: '',
   })
+  const [surfaces, setSurfaces] = useState({ ff: false, workspaces: false })
   const [loading, setLoading] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [focusedField, setFocusedField] = useState<'username' | 'password' | 'confirmPassword' | null>(null)
@@ -126,12 +128,20 @@ export default function SignupPage() {
     setFieldErrors({})
     setErrorPopupField(null)
 
-    const result = await signUp(form)
+    if (!surfaces.ff && !surfaces.workspaces) {
+      setLoading(false)
+      setFieldErrors({ surfaces: 'Pick at least one to continue.' })
+      return
+    }
+
+    const result = await signUp({ ...form, surfaces })
 
     setLoading(false)
 
     if (!result.success) {
-      if (result.field) {
+      if (result.field === 'surfaces') {
+        setFieldErrors({ surfaces: result.error })
+      } else if (result.field) {
         setFieldErrors({ [result.field]: result.error })
         setErrorPopupField(popupOwnerFor(result.field))
       } else {
@@ -317,6 +327,57 @@ export default function SignupPage() {
                 {fieldErrors.confirmPassword}
               </div>
             )}
+          </div>
+
+          <div className="mt-2">
+            <p className="mb-2 text-left text-sm font-medium text-muted">Where do you want to use dēmos?</p>
+            <div className="flex flex-col gap-2">
+              <label
+                className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-left transition ${
+                  surfaces.ff ? 'border-accent bg-accent/5' : 'border-border bg-surface hover:border-border-strong'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={surfaces.ff}
+                  onChange={(e) => {
+                    setSurfaces((prev) => ({ ...prev, ff: e.target.checked }))
+                    setFieldErrors((prev) => ({ ...prev, surfaces: undefined }))
+                  }}
+                  className="mt-0.5 h-4 w-4 rounded border-border-strong bg-surface"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-foreground">Friends &amp; Family</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Casual, always-public polls with your friends and family.
+                  </span>
+                </span>
+              </label>
+              <label
+                className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-left transition ${
+                  surfaces.workspaces
+                    ? 'border-accent bg-accent/5'
+                    : 'border-border bg-surface hover:border-border-strong'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={surfaces.workspaces}
+                  onChange={(e) => {
+                    setSurfaces((prev) => ({ ...prev, workspaces: e.target.checked }))
+                    setFieldErrors((prev) => ({ ...prev, surfaces: undefined }))
+                  }}
+                  className="mt-0.5 h-4 w-4 rounded border-border-strong bg-surface"
+                />
+                <span>
+                  <span className="block text-sm font-medium text-foreground">Teams / Workspaces</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    Private sessions, member roles, and admin controls for your team.
+                  </span>
+                </span>
+              </label>
+            </div>
+            {fieldErrors.surfaces && <p className="mt-2 text-xs text-red-400">{fieldErrors.surfaces}</p>}
           </div>
 
           {fieldErrors.general && <p className="text-sm text-red-400">{fieldErrors.general}</p>}

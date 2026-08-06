@@ -1,13 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import type { UserSummary } from '../(auth)/_lib/schema'
 import { getSurfaceAccess } from '../(auth)/_lib/actions'
-import { listMyWorkspaces } from './_lib/actions'
-import type { Workspace } from './_lib/schema'
+import { listMyWorkspaces } from '../workspaces/_lib/actions'
+import type { Workspace } from '../workspaces/_lib/schema'
 import { listSessions } from '../sessions/_lib/actions'
 import type { VotingSession } from '../sessions/_lib/schema'
 import { listNotifications } from '../notifications/_lib/actions'
 import type { Notification } from '../notifications/_lib/schema'
-import { WorkspaceDashboardClient } from './_components/WorkspaceDashboardClient'
+import { FamilyDashboardClient } from './_components/FamilyDashboardClient'
 
 function buildFakeSessions(workspaceId: string): VotingSession[] {
   const now = new Date().toISOString()
@@ -24,7 +24,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       allow_anonymous_vote: true,
       results_visibility: 'hidden_until_close',
       results_style: null,
-      ballot_secrecy: 'secret',
+      ballot_secrecy: 'open',
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
@@ -32,24 +32,6 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
     },
     {
       id: 'fake-s2',
-      workspace_id: workspaceId,
-      title: 'Q3 roadmap priorities',
-      description: null,
-      vote_format: 'multiple',
-      visibility: 'private',
-      status: 'draft',
-      who_can_vote: 'all_members',
-      allow_anonymous_vote: false,
-      results_visibility: 'hidden_until_close',
-      results_style: null,
-      ballot_secrecy: 'secret',
-      start_time: null,
-      end_time: null,
-      createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
-      created_at: now,
-    },
-    {
-      id: 'fake-s3',
       workspace_id: workspaceId,
       title: 'Best UI/UX design software',
       description: null,
@@ -60,16 +42,16 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       allow_anonymous_vote: true,
       results_visibility: 'live',
       results_style: null,
-      ballot_secrecy: 'secret',
+      ballot_secrecy: 'open',
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-user-2', username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
       created_at: now,
     },
     {
-      id: 'fake-s4',
+      id: 'fake-s3',
       workspace_id: workspaceId,
-      title: 'Team offsite location',
+      title: 'Family trip destination',
       description: null,
       vote_format: 'ranked',
       visibility: 'public',
@@ -78,7 +60,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       allow_anonymous_vote: false,
       results_visibility: 'after_you_vote',
       results_style: null,
-      ballot_secrecy: 'secret',
+      ballot_secrecy: 'open',
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-user-3', username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
@@ -87,7 +69,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
   ]
 }
 
-export default async function WorkspacesPage() {
+export default async function FamilyPage() {
   const supabase = await createClient()
   const {
     data: { user },
@@ -112,24 +94,24 @@ export default async function WorkspacesPage() {
     }
   }
 
-  const workspacesResult = await listMyWorkspaces('workspaces')
-  const workspaces: Workspace[] = workspacesResult.success ? (workspacesResult.workspaces ?? []) : []
+  const groupsResult = await listMyWorkspaces('ff')
+  const groups: Workspace[] = groupsResult.success ? (groupsResult.workspaces ?? []) : []
 
   const surfaceAccess = user ? await getSurfaceAccess() : { success: false as const }
   const canSwitchSurface = Boolean(surfaceAccess.success && surfaceAccess.hasFf && surfaceAccess.hasWorkspaces)
 
-  const initialWorkspaceId = workspaces[0]?.id ?? null
+  const initialGroupId = groups[0]?.id ?? null
 
   let initialSessions: VotingSession[] = []
   let usingFakeSessions = false
 
-  if (initialWorkspaceId) {
-    const sessionsResult = await listSessions(initialWorkspaceId)
+  if (initialGroupId) {
+    const sessionsResult = await listSessions(initialGroupId)
     if (sessionsResult.success) {
       initialSessions = sessionsResult.sessions ?? []
     } else {
       usingFakeSessions = true
-      initialSessions = buildFakeSessions(initialWorkspaceId)
+      initialSessions = buildFakeSessions(initialGroupId)
     }
   }
 
@@ -142,9 +124,9 @@ export default async function WorkspacesPage() {
   }
 
   return (
-    <WorkspaceDashboardClient
-      workspaces={workspaces}
-      initialWorkspaceId={initialWorkspaceId}
+    <FamilyDashboardClient
+      groups={groups}
+      initialGroupId={initialGroupId}
       initialSessions={initialSessions}
       usingFakeSessions={usingFakeSessions}
       currentUser={currentUser}

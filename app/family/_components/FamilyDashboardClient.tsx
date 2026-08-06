@@ -12,68 +12,11 @@ import { listSessions, listSessionVoters } from '../../sessions/_lib/actions'
 import type { SessionVoter, VotingSession } from '../../sessions/_lib/schema'
 import { NotificationBell } from '../../notifications/_components/NotificationBell'
 import type { Notification } from '../../notifications/_lib/schema'
-import type { Workspace } from '../_lib/schema'
+import type { Workspace } from '../../workspaces/_lib/schema'
 
 type Tab = 'active' | 'drafts' | 'history'
-type WorkspaceType = 'standard' | 'ff'
 
-const THEME: Record<
-  WorkspaceType,
-  {
-    tabActive: string
-    rowHover: string
-    badge: Record<VotingSession['status'], string>
-    // 'cards' (ff) and 'table' (standard) render the same session list data
-    // through the same component — just two branches of one JSX block below,
-    // not a forked component tree — per CLAUDE.md's "identical
-    // layout/components, only visual treatment differs" rule.
-    layout: 'table' | 'cards'
-    tabLabel: Record<Tab, string>
-    greeting: boolean
-    cardAccent: string[]
-  }
-> = {
-  standard: {
-    tabActive: 'border-accent text-accent',
-    rowHover: 'hover:bg-surface/60',
-    badge: {
-      draft: 'text-muted',
-      open: 'text-emerald-400',
-      closed: 'text-amber-400',
-      results_released: 'text-sky-400',
-    },
-    layout: 'table',
-    tabLabel: { active: 'Active', drafts: 'Drafts', history: 'History' },
-    greeting: false,
-    cardAccent: [],
-  },
-  ff: {
-    tabActive: 'border-fuchsia-400 text-fuchsia-300',
-    rowHover: 'hover:bg-fuchsia-950/20',
-    badge: {
-      draft: 'text-muted',
-      open: 'text-fuchsia-400',
-      closed: 'text-amber-300',
-      results_released: 'text-emerald-300',
-    },
-    layout: 'cards',
-    tabLabel: { active: 'Active Polls', drafts: 'Drafts', history: 'Past Results' },
-    greeting: true,
-    cardAccent: [
-      'from-fuchsia-500 to-violet-500',
-      'from-sky-400 to-fuchsia-500',
-      'from-amber-400 to-fuchsia-500',
-      'from-emerald-400 to-sky-500',
-    ],
-  },
-}
-
-function greetingPhrase(): string {
-  const hour = new Date().getHours()
-  if (hour < 12) return 'Good morning'
-  if (hour < 18) return 'Good afternoon'
-  return 'Good evening'
-}
+const TAB_LABEL: Record<Tab, string> = { active: 'Active Polls', drafts: 'Drafts', history: 'Past Results' }
 
 const STATUS_LABEL: Record<VotingSession['status'], string> = {
   draft: 'Draft',
@@ -82,12 +25,19 @@ const STATUS_LABEL: Record<VotingSession['status'], string> = {
   results_released: 'Results released',
 }
 
-function buildFakeSessions(workspaceId: string): VotingSession[] {
+const CARD_ACCENTS = [
+  'from-fuchsia-500 to-violet-500',
+  'from-sky-400 to-fuchsia-500',
+  'from-amber-400 to-fuchsia-500',
+  'from-emerald-400 to-sky-500',
+]
+
+function buildFakeSessions(groupId: string): VotingSession[] {
   const now = new Date().toISOString()
   return [
     {
       id: 'fake-s1',
-      workspace_id: workspaceId,
+      workspace_id: groupId,
       title: 'Where should we eat lunch tomorrow?',
       description: null,
       vote_format: 'single',
@@ -97,7 +47,7 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       allow_anonymous_vote: true,
       results_visibility: 'hidden_until_close',
       results_style: null,
-      ballot_secrecy: 'secret',
+      ballot_secrecy: 'open',
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
@@ -105,44 +55,8 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
     },
     {
       id: 'fake-s2',
-      workspace_id: workspaceId,
-      title: 'Q3 roadmap priorities',
-      description: null,
-      vote_format: 'multiple',
-      visibility: 'private',
-      status: 'draft',
-      who_can_vote: 'all_members',
-      allow_anonymous_vote: false,
-      results_visibility: 'hidden_until_close',
-      results_style: null,
-      ballot_secrecy: 'secret',
-      start_time: null,
-      end_time: null,
-      createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
-      created_at: now,
-    },
-    {
-      id: 'fake-s3',
-      workspace_id: workspaceId,
-      title: 'Best UI/UX design software',
-      description: null,
-      vote_format: 'single',
-      visibility: 'public',
-      status: 'closed',
-      who_can_vote: 'public_link',
-      allow_anonymous_vote: true,
-      results_visibility: 'live',
-      results_style: null,
-      ballot_secrecy: 'secret',
-      start_time: null,
-      end_time: null,
-      createdBy: { id: 'fake-user-2', username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
-      created_at: now,
-    },
-    {
-      id: 'fake-s4',
-      workspace_id: workspaceId,
-      title: 'Team offsite location',
+      workspace_id: groupId,
+      title: 'Family trip destination',
       description: null,
       vote_format: 'ranked',
       visibility: 'public',
@@ -151,13 +65,20 @@ function buildFakeSessions(workspaceId: string): VotingSession[] {
       allow_anonymous_vote: false,
       results_visibility: 'after_you_vote',
       results_style: null,
-      ballot_secrecy: 'secret',
+      ballot_secrecy: 'open',
       start_time: null,
       end_time: null,
       createdBy: { id: 'fake-user-3', username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
       created_at: now,
     },
   ]
+}
+
+function greetingPhrase(): string {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
 }
 
 function creatorName(session: VotingSession) {
@@ -184,9 +105,9 @@ function voterInitial(voter: SessionVoter) {
   return voterName(voter).charAt(0).toUpperCase()
 }
 
-export function WorkspaceDashboardClient({
-  workspaces,
-  initialWorkspaceId,
+export function FamilyDashboardClient({
+  groups,
+  initialGroupId,
   initialSessions,
   usingFakeSessions,
   currentUser,
@@ -194,8 +115,8 @@ export function WorkspaceDashboardClient({
   initialNotifications,
   canSwitchSurface,
 }: {
-  workspaces: Workspace[]
-  initialWorkspaceId: string | null
+  groups: Workspace[]
+  initialGroupId: string | null
   initialSessions: VotingSession[]
   usingFakeSessions: boolean
   currentUser: UserSummary | null
@@ -204,7 +125,7 @@ export function WorkspaceDashboardClient({
   canSwitchSurface: boolean
 }) {
   const router = useRouter()
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(initialWorkspaceId)
+  const [selectedGroupId, setSelectedGroupId] = useState(initialGroupId)
   const [sessions, setSessions] = useState(initialSessions)
   const [usingFake, setUsingFake] = useState(usingFakeSessions)
   const [tab, setTab] = useState<Tab>('active')
@@ -217,22 +138,21 @@ export function WorkspaceDashboardClient({
     router.refresh()
   }
 
-  const selectedWorkspace = workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ?? null
-  const theme = THEME[selectedWorkspace?.type === 'ff' ? 'ff' : 'standard']
+  const selectedGroup = groups.find((group) => group.id === selectedGroupId) ?? null
 
-  async function selectWorkspace(workspaceId: string) {
-    setSelectedWorkspaceId(workspaceId)
+  async function selectGroup(groupId: string) {
+    setSelectedGroupId(groupId)
     setLoading(true)
     setTab('active')
 
-    const result = await listSessions(workspaceId)
+    const result = await listSessions(groupId)
     setLoading(false)
 
     if (result.success) {
       setSessions(result.sessions ?? [])
       setUsingFake(false)
     } else {
-      setSessions(buildFakeSessions(workspaceId))
+      setSessions(buildFakeSessions(groupId))
       setUsingFake(true)
     }
   }
@@ -245,15 +165,11 @@ export function WorkspaceDashboardClient({
 
   const filteredIds = filtered.map((session) => session.id).join(',')
 
-  // Real participation avatars for the ff card grid — replaces the old
-  // creator-initial-plus-decorative-dots cluster. Only fetched for ff
-  // (theme.layout === 'cards'; the standard table never showed avatars) and
-  // skipped entirely for placeholder/fake sessions, whose ids don't exist
-  // in the database. Scoped to whatever's currently visible in the active
-  // tab, not every session in the workspace — still one request per visible
-  // card, but bounded to what's actually on screen.
+  // Real participation avatars — see the same fetch in
+  // WorkspaceDashboardClient (app/workspaces/_components), skipped for
+  // placeholder/fake sessions whose ids don't exist in the database.
   useEffect(() => {
-    if (theme.layout !== 'cards' || usingFake || filtered.length === 0) {
+    if (usingFake || filtered.length === 0) {
       setVotersBySession(new Map())
       return
     }
@@ -278,7 +194,7 @@ export function WorkspaceDashboardClient({
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- filteredIds is a stable proxy for filtered's contents, avoiding a re-fetch loop from the new array identity `.filter()` produces every render
-  }, [filteredIds, theme.layout, usingFake])
+  }, [filteredIds, usingFake])
 
   return (
     <div className="relative flex min-h-screen overflow-hidden bg-background">
@@ -287,7 +203,7 @@ export function WorkspaceDashboardClient({
       <aside className="relative z-10 flex w-60 shrink-0 flex-col border-r border-divider bg-background/80 px-4 py-6">
         <Link
           href="/"
-          className="mb-4 flex items-center gap-1.5 px-1 text-xs text-muted transition hover:text-foreground"
+          className="mb-4 flex items-center gap-1.5 px-1 text-xs text-muted transition hover:text-fuchsia-300"
         >
           <span aria-hidden="true">←</span> Back to home
         </Link>
@@ -300,16 +216,12 @@ export function WorkspaceDashboardClient({
         </div>
 
         <nav className="flex flex-col gap-1 text-sm">
-          <span className="rounded-lg bg-accent/10 px-3 py-2 text-accent">Dashboard</span>
+          <span className="rounded-lg bg-fuchsia-500/10 px-3 py-2 text-fuchsia-300">Dashboard</span>
           <Link
-            href={
-              selectedWorkspaceId
-                ? `/sessions/create?workspaceId=${selectedWorkspaceId}&workspaceType=${selectedWorkspace?.type ?? 'standard'}`
-                : '#'
-            }
+            href={selectedGroupId ? `/sessions/create?workspaceId=${selectedGroupId}&workspaceType=ff` : '#'}
             className="rounded-lg px-3 py-2 text-muted transition hover:bg-foreground/5 hover:text-foreground"
           >
-            Create a Session
+            Create a Poll
           </Link>
           <Link
             href="/join"
@@ -319,30 +231,30 @@ export function WorkspaceDashboardClient({
           </Link>
         </nav>
 
-        <p className="mb-2 mt-8 px-3 text-xs uppercase tracking-wide text-subtle">Workspaces</p>
+        <p className="mb-2 mt-8 px-3 text-xs uppercase tracking-wide text-subtle">Groups</p>
         <div className="flex flex-col gap-1">
-          {workspaces.map((workspace) => (
+          {groups.map((group) => (
             <button
-              key={workspace.id}
+              key={group.id}
               type="button"
-              onClick={() => selectWorkspace(workspace.id)}
+              onClick={() => selectGroup(group.id)}
               className={`truncate rounded-lg px-3 py-2 text-left text-sm transition ${
-                workspace.id === selectedWorkspaceId
-                  ? 'bg-accent/10 text-accent'
+                group.id === selectedGroupId
+                  ? 'bg-fuchsia-500/10 text-fuchsia-300'
                   : 'text-muted hover:bg-foreground/5 hover:text-foreground'
               }`}
             >
-              {workspace.name}
+              {group.name}
             </button>
           ))}
-          {workspaces.length === 0 && <p className="px-3 text-xs text-subtle">No workspaces yet.</p>}
+          {groups.length === 0 && <p className="px-3 text-xs text-subtle">No groups yet.</p>}
         </div>
 
         <Link
-          href="/workspaces/create"
-          className="mt-4 rounded-lg border border-dashed border-border px-3 py-2 text-center text-xs text-muted transition hover:border-accent hover:text-accent"
+          href="/family/create"
+          className="mt-4 rounded-lg border border-dashed border-border px-3 py-2 text-center text-xs text-muted transition hover:border-fuchsia-400 hover:text-fuchsia-300"
         >
-          + New Workspace
+          + New Group
         </Link>
 
         <div className="mt-auto border-t border-divider pt-4">
@@ -376,14 +288,14 @@ export function WorkspaceDashboardClient({
       <main className="relative z-10 flex-1 px-8 py-10">
         {canSwitchSurface && (
           <div className="mb-6 flex justify-end">
-            <SwitchSurfaceControl current="workspaces" />
+            <SwitchSurfaceControl current="ff" />
           </div>
         )}
 
-        {!selectedWorkspace ? (
+        {!selectedGroup ? (
           <p className="text-sm text-muted">
-            You&apos;re not in any workspaces yet.{' '}
-            <Link href="/workspaces/create" className="underline">
+            You&apos;re not in any groups yet.{' '}
+            <Link href="/family/create" className="underline">
               Create one
             </Link>{' '}
             to get started.
@@ -392,16 +304,14 @@ export function WorkspaceDashboardClient({
           <>
             {usingFake && (
               <p className="mb-6 inline-block rounded-lg border border-yellow-800 bg-yellow-950/50 px-4 py-2 text-xs text-yellow-400">
-                Showing placeholder sessions — listSessions isn&apos;t returning real data for this workspace yet.
+                Showing placeholder polls — listSessions isn&apos;t returning real data for this group yet.
               </p>
             )}
 
-            {theme.greeting && (
-              <p className="text-sm text-muted">
-                {greetingPhrase()}, {currentUser?.firstName?.trim() || 'there'}!
-              </p>
-            )}
-            <h1 className="font-heading text-3xl text-foreground">{selectedWorkspace.name}</h1>
+            <p className="text-sm text-muted">
+              {greetingPhrase()}, {currentUser?.firstName?.trim() || 'there'}!
+            </p>
+            <h1 className="font-heading text-3xl text-foreground">{selectedGroup.name}</h1>
 
             <div className="mt-6 flex gap-6 border-b border-divider text-sm">
               {(['active', 'drafts', 'history'] as Tab[]).map((t) => (
@@ -410,10 +320,12 @@ export function WorkspaceDashboardClient({
                   type="button"
                   onClick={() => setTab(t)}
                   className={`border-b-2 px-1 pb-3 transition ${
-                    tab === t ? theme.tabActive : 'border-transparent text-muted hover:text-foreground'
+                    tab === t
+                      ? 'border-fuchsia-400 text-fuchsia-300'
+                      : 'border-transparent text-muted hover:text-foreground'
                   }`}
                 >
-                  {theme.tabLabel[t]}
+                  {TAB_LABEL[t]}
                 </button>
               ))}
             </div>
@@ -422,15 +334,15 @@ export function WorkspaceDashboardClient({
               {loading ? (
                 <p className="py-8 text-sm text-muted">Loading…</p>
               ) : filtered.length === 0 ? (
-                <p className="py-8 text-sm text-muted">No sessions here yet.</p>
-              ) : theme.layout === 'cards' ? (
+                <p className="py-8 text-sm text-muted">No polls here yet.</p>
+              ) : (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   {filtered.map((session, i) => (
                     <Link
                       key={session.id}
                       href={`/sessions/${session.id}`}
                       className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br p-5 text-white shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl ${
-                        theme.cardAccent[i % theme.cardAccent.length]
+                        CARD_ACCENTS[i % CARD_ACCENTS.length]
                       }`}
                     >
                       <p className="text-xs font-medium uppercase tracking-wide text-white/70">
@@ -467,43 +379,13 @@ export function WorkspaceDashboardClient({
                                 </span>
                               )}
                             </div>
-                            <span className="text-xs text-white/70">
-                              {voters.length} voted
-                            </span>
+                            <span className="text-xs text-white/70">{voters.length} voted</span>
                           </div>
                         )
                       })()}
                     </Link>
                   ))}
                 </div>
-              ) : (
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-divider text-xs uppercase tracking-wide text-subtle">
-                      <th className="py-2 font-normal">Title</th>
-                      <th className="py-2 font-normal">Status</th>
-                      <th className="py-2 font-normal">Created by</th>
-                      <th className="py-2 font-normal">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((session) => (
-                      <tr key={session.id} className={`border-b border-divider/60 ${theme.rowHover}`}>
-                        <td className="py-3">
-                          <Link
-                            href={`/sessions/${session.id}`}
-                            className="text-foreground transition hover:underline"
-                          >
-                            {session.title}
-                          </Link>
-                        </td>
-                        <td className={`py-3 ${theme.badge[session.status]}`}>{STATUS_LABEL[session.status]}</td>
-                        <td className="py-3 text-muted">{creatorName(session)}</td>
-                        <td className="py-3 text-muted">{new Date(session.created_at).toLocaleDateString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               )}
             </div>
           </>
