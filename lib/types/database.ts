@@ -146,23 +146,33 @@ export type Database = {
       session_access_grants: {
         Row: {
           created_at: string
+          group_id: string | null
           id: string
           session_id: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
+          group_id?: string | null
           id?: string
           session_id: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
+          group_id?: string | null
           id?: string
           session_id?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "session_access_grants_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_groups"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "session_access_grants_session_id_fkey"
             columns: ["session_id"]
@@ -288,11 +298,13 @@ export type Database = {
       voting_sessions: {
         Row: {
           allow_anonymous_vote: boolean
+          ballot_secrecy: string
           created_at: string
           created_by: string
           description: string | null
           end_time: string | null
           id: string
+          results_style: string | null
           results_visibility: string
           start_time: string | null
           status: string
@@ -304,11 +316,13 @@ export type Database = {
         }
         Insert: {
           allow_anonymous_vote?: boolean
+          ballot_secrecy?: string
           created_at?: string
           created_by: string
           description?: string | null
           end_time?: string | null
           id?: string
+          results_style?: string | null
           results_visibility: string
           start_time?: string | null
           status?: string
@@ -320,11 +334,13 @@ export type Database = {
         }
         Update: {
           allow_anonymous_vote?: boolean
+          ballot_secrecy?: string
           created_at?: string
           created_by?: string
           description?: string | null
           end_time?: string | null
           id?: string
+          results_style?: string | null
           results_visibility?: string
           start_time?: string | null
           status?: string
@@ -344,10 +360,73 @@ export type Database = {
           },
         ]
       }
+      workspace_group_members: {
+        Row: {
+          created_at: string
+          group_id: string
+          membership_id: string
+        }
+        Insert: {
+          created_at?: string
+          group_id: string
+          membership_id: string
+        }
+        Update: {
+          created_at?: string
+          group_id?: string
+          membership_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_group_members_membership_id_fkey"
+            columns: ["membership_id"]
+            isOneToOne: false
+            referencedRelation: "workspace_memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_groups: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_groups_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_memberships: {
         Row: {
           created_at: string
           id: string
+          initiated_by: string
           role: string
           status: string
           user_id: string
@@ -356,6 +435,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          initiated_by?: string
           role?: string
           status?: string
           user_id: string
@@ -364,6 +444,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          initiated_by?: string
           role?: string
           status?: string
           user_id?: string
@@ -415,6 +496,10 @@ export type Database = {
         Args: { target_session_id: string }
         Returns: boolean
       }
+      can_view_ballot_linkage: {
+        Args: { target_session_id: string }
+        Returns: boolean
+      }
       can_view_session_results: {
         Args: { target_session_id: string }
         Returns: boolean
@@ -427,11 +512,23 @@ export type Database = {
         Args: { p_name: string; p_type: string }
         Returns: Json
       }
+      get_session_selections_for_tally: {
+        Args: { target_session_id: string }
+        Returns: {
+          ballot_ref: number
+          option_id: string
+          rank: number
+        }[]
+      }
       get_workspace_session_summaries: {
         Args: { p_workspace_id: string }
         Returns: Json
       }
       get_workspace_stats: { Args: { p_workspace_id: string }; Returns: Json }
+      invite_by_identifier: {
+        Args: { p_identifier: string; p_role: string; p_workspace_id: string }
+        Returns: Json
+      }
       is_active_workspace_member: {
         Args: { target_workspace_id: string }
         Returns: boolean
@@ -440,7 +537,19 @@ export type Database = {
         Args: { target_workspace_id: string }
         Returns: boolean
       }
+      is_workspace_owner: {
+        Args: { target_user_id?: string; target_workspace_id: string }
+        Returns: boolean
+      }
       join_workspace_by_code: { Args: { p_code: string }; Returns: Json }
+      respond_to_invite: {
+        Args: { p_accept: boolean; p_membership_id: string }
+        Returns: Json
+      }
+      transfer_workspace_ownership: {
+        Args: { p_new_owner_user_id: string; p_workspace_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
