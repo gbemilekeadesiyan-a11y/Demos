@@ -3,7 +3,7 @@
 import { randomBytes } from 'crypto'
 import { createClient } from '../../../lib/supabase/server'
 import type { UserSummary } from '../../(auth)/_lib/schema'
-import type { Workspace, WorkspaceMembership, WorkspaceSessionSummary, WorkspaceStats } from './schema'
+import type { Workspace, WorkspaceGroup, WorkspaceMembership, WorkspaceSessionSummary, WorkspaceStats } from './schema'
 
 type ProfileRow = { id: string; username: string; first_name: string; last_name: string }
 
@@ -130,11 +130,17 @@ export async function approveMembership(
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
 
+  // Scoped to 'self'-initiated rows (someone requested to join) — this is
+  // the admin-approves-a-request direction. An admin-initiated invite
+  // ('admin') is accepted/declined by the invited user via respondToInvite,
+  // not approved by an admin here. See
+  // supabase/migrations/017_workspace_ownership_and_invites.sql.
   const { error } = await supabase
     .from('workspace_memberships')
     .update({ status: 'active' })
     .eq('id', membershipId)
     .eq('status', 'pending')
+    .eq('initiated_by', 'self')
     .select()
     .single()
 
@@ -150,16 +156,147 @@ export async function rejectMembership(
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
 
+  // Same 'self'-initiated scoping as approveMembership above.
   const { error } = await supabase
     .from('workspace_memberships')
     .delete()
     .eq('id', membershipId)
     .eq('status', 'pending')
+    .eq('initiated_by', 'self')
     .select()
     .single()
 
   if (error) {
     return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+// Admin invites a specific person by username or email — distinct from
+// generateInvite's shareable code. The invited user shows up as a
+// 'pending'/'admin'-initiated membership and responds via respondToInvite
+// below. See invite_by_identifier in
+// supabase/migrations/017_workspace_ownership_and_invites.sql for identifier
+// resolution, the "already a member" guard, and the notification insert —
+// all done together as a security-definer RPC since a regular client can't
+// insert a membership row for someone else, or a notification for anyone
+// but themselves, under RLS.
+export async function inviteByIdentifier(
+  workspaceId: string,
+  identifier: string,
+  role: 'admin' | 'moderator' | 'member'
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.rpc('invite_by_identifier', {
+    p_workspace_id: workspaceId,
+    p_identifier: identifier,
+    p_role: role,
+  })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  const result = data as { success: boolean; error?: string }
+
+  if (!result.success) {
+    return { success: false, error: result.error ?? 'Could not send invite' }
+  }
+
+  return { success: true }
+}
+
+// The invited user's response to an admin-initiated invite — distinct from
+// approveMembership, which is the admin-approves-a-request direction (see
+// that function's comment). accept: true activates the membership; false
+// deletes it.
+export async function respondToInvite(
+  membershipId: string,
+  accept: boolean
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.rpc('respond_to_invite', {
+    p_membership_id: membershipId,
+    p_accept: accept,
+  })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  const result = data as { success: boolean; error?: string }
+
+  if (!result.success) {
+    return { success: false, error: result.error ?? 'Could not respond to invite' }
+  }
+
+  return { success: true }
+}
+
+export async function leaveWorkspace(workspaceId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  // Checked up front for a friendly message — RLS (017_*.sql) blocks the
+  // delete below regardless, so this isn't the only thing standing between
+  // an owner and accidentally removing their own membership.
+  const { data: workspace } = await supabase
+    .from('workspaces')
+    .select('created_by')
+    .eq('id', workspaceId)
+    .single()
+
+  if (workspace?.created_by === user.id) {
+    return { success: false, error: 'Transfer ownership before leaving.' }
+  }
+
+  const { error } = await supabase
+    .from('workspace_memberships')
+    .delete()
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+// The only way workspaces.created_by can change — enforced by a trigger,
+// not just by this function existing (see prevent_direct_ownership_change
+// in supabase/migrations/017_workspace_ownership_and_invites.sql). Caller
+// must be the *current* owner; the new owner must already be an active
+// member and is promoted to role = 'admin' if they aren't already.
+export async function transferOwnership(
+  workspaceId: string,
+  newOwnerUserId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.rpc('transfer_workspace_ownership', {
+    p_workspace_id: workspaceId,
+    p_new_owner_user_id: newOwnerUserId,
+  })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  const result = data as { success: boolean; error?: string }
+
+  if (!result.success) {
+    return { success: false, error: result.error ?? 'Could not transfer ownership' }
   }
 
   return { success: true }
@@ -295,6 +432,124 @@ export async function getWorkspaceSessionSummaries(workspaceId: string): Promise
   }
 
   return { success: true, sessions: result.sessions ?? [] }
+}
+
+// Departments — the WorkspaceGroup entity deferred in
+// demos-system-design.md § 3. Workspaces-only, not F&F: RLS
+// (018_departments.sql) rejects creation under an ff workspace at the
+// database layer, so createDepartment surfaces whatever error message that
+// produces rather than needing its own type check here.
+export async function createDepartment(
+  workspaceId: string,
+  name: string
+): Promise<{ success: boolean; error?: string; groupId?: string }> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('workspace_groups')
+    .insert({ workspace_id: workspaceId, name })
+    .select('id')
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true, groupId: data.id }
+}
+
+export async function renameDepartment(
+  groupId: string,
+  name: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('workspace_groups')
+    .update({ name })
+    .eq('id', groupId)
+    .select()
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+export async function deleteDepartment(groupId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  // workspace_group_members rows cascade on delete (018_departments.sql) —
+  // no separate cleanup needed here.
+  const { error } = await supabase.from('workspace_groups').delete().eq('id', groupId)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+export async function listDepartments(workspaceId: string): Promise<{
+  success: boolean
+  error?: string
+  departments?: WorkspaceGroup[]
+}> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('workspace_groups')
+    .select('id, workspace_id, name, created_at')
+    .eq('workspace_id', workspaceId)
+    .order('name')
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true, departments: (data ?? []) as WorkspaceGroup[] }
+}
+
+// membershipId, not userId — department membership is scoped to the
+// person's workspace_memberships row (018_departments.sql), so the caller
+// needs to have that id already (e.g. from getWorkspaceDetails' member
+// list), not just a bare user id.
+export async function addMemberToDepartment(
+  groupId: string,
+  membershipId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('workspace_group_members')
+    .insert({ group_id: groupId, membership_id: membershipId })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}
+
+export async function removeMemberFromDepartment(
+  groupId: string,
+  membershipId: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('workspace_group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('membership_id', membershipId)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
 }
 
 export async function getWorkspaceDetails(workspaceId: string): Promise<{

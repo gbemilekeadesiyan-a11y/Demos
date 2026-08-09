@@ -68,7 +68,7 @@ export async function createVotingSession(
     description?: string
     voteFormat: 'single' | 'multiple' | 'ranked'
     visibility: 'public' | 'private'
-    whoCanVote: 'all_members' | 'invited_list' | 'public_link'
+    whoCanVote: 'all_members' | 'invited_list' | 'public_link' | 'departments'
     allowAnonymousVote: boolean
     resultsVisibility: 'hidden_until_close' | 'live' | 'after_you_vote'
     ballotSecrecy?: 'secret' | 'open'
@@ -166,15 +166,22 @@ export async function addSessionOption(
   return { success: true, optionId: data.id }
 }
 
+// Either a specific user or a department (workspace_groups.id) — never
+// both, matching the session_access_grants_target_check constraint in
+// supabase/migrations/018_departments.sql. A department grant resolves at
+// access-check time through workspace_group_members, not by expanding to
+// individual user_id rows here.
 export async function grantSessionAccess(
   sessionId: string,
-  userId: string
+  target: { userId: string } | { departmentId: string }
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = await createClient()
 
-  const { error } = await supabase
-    .from('session_access_grants')
-    .insert({ session_id: sessionId, user_id: userId })
+  const { error } = await supabase.from('session_access_grants').insert({
+    session_id: sessionId,
+    user_id: 'userId' in target ? target.userId : null,
+    group_id: 'departmentId' in target ? target.departmentId : null,
+  })
 
   if (error) {
     return { success: false, error: error.message }
@@ -186,7 +193,9 @@ export async function grantSessionAccess(
 export async function listSessionAccessGrants(sessionId: string): Promise<{
   success: boolean
   error?: string
-  grants?: { id: string; user: UserSummary | null; createdAt: string }[]
+  // A row has either `user` set (departmentId null) or `departmentId` set
+  // (user null) — never both, mirroring grantSessionAccess's input shape.
+  grants?: { id: string; user: UserSummary | null; departmentId: string | null; createdAt: string }[]
 }> {
   const supabase = await createClient()
 
@@ -194,7 +203,7 @@ export async function listSessionAccessGrants(sessionId: string): Promise<{
   // to the session's workspace admins plus each grantee seeing their own row.
   const { data, error } = await supabase
     .from('session_access_grants')
-    .select('id, user_id, created_at')
+    .select('id, user_id, group_id, created_at')
     .eq('session_id', sessionId)
 
   if (error) {
@@ -211,7 +220,8 @@ export async function listSessionAccessGrants(sessionId: string): Promise<{
     success: true,
     grants: rows.map((row) => ({
       id: row.id,
-      user: profiles.get(row.user_id) ?? null,
+      user: row.user_id ? (profiles.get(row.user_id) ?? null) : null,
+      departmentId: row.group_id,
       createdAt: row.created_at,
     })),
   }

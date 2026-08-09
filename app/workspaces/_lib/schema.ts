@@ -61,8 +61,24 @@ export type WorkspaceMembership = {
   user_id: string
   role: 'admin' | 'moderator' | 'member'
   status: 'active' | 'pending'
+  // 'self' — the user requested to join (approveMembership/rejectMembership
+  // is the admin-side response). 'admin' — an admin invited this person
+  // directly via inviteByIdentifier (respondToInvite is the user-side
+  // response). See supabase/migrations/017_workspace_ownership_and_invites.sql.
+  initiated_by: 'self' | 'admin'
   created_at: string
   // Populated by a joined profiles lookup in getWorkspaceDetails; null for
   // anonymous members (no profiles row) rather than failing the query.
   user: UserSummary | null
+}
+
+// Departments — the WorkspaceGroup entity deferred in
+// demos-system-design.md § 3. Workspaces-only, not F&F (enforced in
+// supabase/migrations/018_departments.sql, not just by the UI never
+// offering it for an ff workspace).
+export type WorkspaceGroup = {
+  id: string
+  workspace_id: string
+  name: string
+  created_at: string
 }

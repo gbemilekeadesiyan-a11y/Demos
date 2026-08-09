@@ -10,7 +10,12 @@ export type VotingSession = {
   vote_format: 'single' | 'multiple' | 'ranked'
   visibility: 'public' | 'private'
   status: 'draft' | 'open' | 'closed' | 'results_released'
-  who_can_vote: 'all_members' | 'invited_list' | 'public_link'
+  // 'departments' is Workspaces-only (see supabase/migrations/018_departments.sql
+  // — enforced there, not just by the UI) — F&F workspaces can't create the
+  // sessions or workspace_groups. Resolved through the same
+  // session_access_grants table as 'invited_list', just with group_id
+  // (department) rows instead of/alongside user_id ones.
+  who_can_vote: 'all_members' | 'invited_list' | 'public_link' | 'departments'
   allow_anonymous_vote: boolean
   results_visibility: 'hidden_until_close' | 'live' | 'after_you_vote'
   // Overrides the vote_format-driven chart default in ResultsDisplay when
