@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getWorkspaceDetails } from '../_lib/actions'
 import type { Workspace, WorkspaceMembership } from '../_lib/schema'
-import { WorkspaceDetailClient } from './_components/WorkspaceDetailClient'
+import { WorkspaceDetailClient } from '@/components/WorkspaceDetailClient'
 
 function buildFakeDetails(
   workspaceId: string,

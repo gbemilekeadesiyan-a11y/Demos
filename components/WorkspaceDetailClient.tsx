@@ -3,8 +3,47 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { AuraBackground } from '@/components/AuraBackground'
-import { approveMembership, generateInvite, rejectMembership, updateMemberRole } from '../../_lib/actions'
-import type { Workspace, WorkspaceMembership } from '../../_lib/schema'
+import {
+  approveMembership,
+  generateInvite,
+  rejectMembership,
+  updateMemberRole,
+} from '@/app/workspaces/_lib/actions'
+import type { Workspace, WorkspaceMembership } from '@/app/workspaces/_lib/schema'
+
+// Visual/copy treatment per workspace.type — same "identical
+// layout/components, only visual treatment differs" rule as
+// WorkspaceDashboardClient's THEME. overviewBase picks the route prefix
+// (/workspaces or /family) the "View Overview" link resolves under, since
+// each surface's overview page lives at its own top-level route.
+const DETAIL_THEME: Record<
+  'standard' | 'ff',
+  {
+    subtitle: string
+    avatarClass: string
+    primaryBtnClass: string
+    inviteSectionClass: string
+    inviteSectionTitle: string
+    overviewBase: string
+  }
+> = {
+  standard: {
+    subtitle: 'Standard workspace',
+    avatarClass: 'bg-border-strong',
+    primaryBtnClass: 'bg-accent text-accent-foreground',
+    inviteSectionClass: 'border-border bg-surface/60',
+    inviteSectionTitle: 'Share workspace',
+    overviewBase: '/workspaces',
+  },
+  ff: {
+    subtitle: 'Friends & Family group',
+    avatarClass: 'bg-gradient-to-br from-fuchsia-500 to-violet-500',
+    primaryBtnClass: 'bg-fuchsia-500 text-white',
+    inviteSectionClass: 'border-fuchsia-400/20 bg-fuchsia-500/5',
+    inviteSectionTitle: 'Invite to group',
+    overviewBase: '/family',
+  },
+}
 
 function displayName(member: WorkspaceMembership) {
   if (!member.user) {
@@ -30,6 +69,8 @@ export function WorkspaceDetailClient({
   isAdmin: boolean
   usingFakeData: boolean
 }) {
+  const theme = DETAIL_THEME[workspace.type === 'ff' ? 'ff' : 'standard']
+
   const [members, setMembers] = useState(initialMembers)
   const [pendingRequests, setPendingRequests] = useState(initialPendingRequests)
   const [error, setError] = useState<string | null>(null)
@@ -108,14 +149,12 @@ export function WorkspaceDetailClient({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h1 className="font-heading text-3xl text-foreground">{workspace.name}</h1>
-            <p className="mt-1 text-sm text-muted">
-              {workspace.type === 'ff' ? 'F&F workspace' : 'Standard workspace'}
-            </p>
+            <p className="mt-1 text-sm text-muted">{theme.subtitle}</p>
           </div>
 
           {isAdmin && (
             <Link
-              href={`/workspaces/${workspaceId}/overview`}
+              href={`${theme.overviewBase}/${workspaceId}/overview`}
               className="rounded-full border border-border px-4 py-2 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
             >
               View Overview
@@ -134,7 +173,7 @@ export function WorkspaceDetailClient({
                 className="flex items-center justify-between rounded-lg border border-border bg-surface/80 px-4 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full bg-border-strong" />
+                  <div className={`h-8 w-8 rounded-full ${theme.avatarClass}`} />
                   <span className="text-sm text-muted">{displayName(member)}</span>
                 </div>
 
@@ -174,7 +213,7 @@ export function WorkspaceDetailClient({
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleApprove(request.id)}
-                        className="rounded-md bg-accent px-3 py-1 text-xs font-medium text-accent-foreground transition hover:opacity-90"
+                        className={`rounded-md px-3 py-1 text-xs font-medium transition hover:opacity-90 ${theme.primaryBtnClass}`}
                       >
                         Approve
                       </button>
@@ -193,8 +232,8 @@ export function WorkspaceDetailClient({
         )}
 
         {isAdmin && (
-          <section className="mt-8 rounded-lg border border-border bg-surface/60 p-4">
-            <h2 className="text-sm font-medium text-muted">Share workspace</h2>
+          <section className={`mt-8 rounded-lg border p-4 ${theme.inviteSectionClass}`}>
+            <h2 className="text-sm font-medium text-muted">{theme.inviteSectionTitle}</h2>
 
             <label className="mt-3 flex items-center gap-2 text-xs text-muted">
               <input
@@ -209,7 +248,7 @@ export function WorkspaceDetailClient({
             <button
               onClick={handleGenerateInvite}
               disabled={inviteLoading}
-              className="mt-3 rounded-full bg-accent px-4 py-2 text-xs font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
+              className={`mt-3 rounded-full px-4 py-2 text-xs font-medium transition hover:opacity-90 disabled:opacity-50 ${theme.primaryBtnClass}`}
             >
               {inviteLoading ? 'Generating…' : 'Generate Invite Link'}
             </button>

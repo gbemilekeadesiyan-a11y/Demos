@@ -347,7 +347,7 @@ export default function SignupPage() {
                   className="mt-0.5 h-4 w-4 rounded border-border-strong bg-surface"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-foreground">Friends &amp; Family</span>
+                  <span className="block text-sm font-medium text-foreground">dēmos Friends &amp; Family</span>
                   <span className="mt-0.5 block text-xs text-muted">
                     Casual, always-public polls with your friends and family.
                   </span>
@@ -370,7 +370,7 @@ export default function SignupPage() {
                   className="mt-0.5 h-4 w-4 rounded border-border-strong bg-surface"
                 />
                 <span>
-                  <span className="block text-sm font-medium text-foreground">Teams / Workspaces</span>
+                  <span className="block text-sm font-medium text-foreground">dēmos Workspaces</span>
                   <span className="mt-0.5 block text-xs text-muted">
                     Private sessions, member roles, and admin controls for your team.
                   </span>

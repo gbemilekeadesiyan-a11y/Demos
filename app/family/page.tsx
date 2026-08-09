@@ -7,7 +7,7 @@ import { listSessions } from '../sessions/_lib/actions'
 import type { VotingSession } from '../sessions/_lib/schema'
 import { listNotifications } from '../notifications/_lib/actions'
 import type { Notification } from '../notifications/_lib/schema'
-import { FamilyDashboardClient } from './_components/FamilyDashboardClient'
+import { WorkspaceDashboardClient } from '@/components/WorkspaceDashboardClient'
 
 function buildFakeSessions(workspaceId: string): VotingSession[] {
   const now = new Date().toISOString()
@@ -95,23 +95,23 @@ export default async function FamilyPage() {
   }
 
   const groupsResult = await listMyWorkspaces('ff')
-  const groups: Workspace[] = groupsResult.success ? (groupsResult.workspaces ?? []) : []
+  const workspaces: Workspace[] = groupsResult.success ? (groupsResult.workspaces ?? []) : []
 
   const surfaceAccess = user ? await getSurfaceAccess() : { success: false as const }
   const canSwitchSurface = Boolean(surfaceAccess.success && surfaceAccess.hasFf && surfaceAccess.hasWorkspaces)
 
-  const initialGroupId = groups[0]?.id ?? null
+  const initialWorkspaceId = workspaces[0]?.id ?? null
 
   let initialSessions: VotingSession[] = []
   let usingFakeSessions = false
 
-  if (initialGroupId) {
-    const sessionsResult = await listSessions(initialGroupId)
+  if (initialWorkspaceId) {
+    const sessionsResult = await listSessions(initialWorkspaceId)
     if (sessionsResult.success) {
       initialSessions = sessionsResult.sessions ?? []
     } else {
       usingFakeSessions = true
-      initialSessions = buildFakeSessions(initialGroupId)
+      initialSessions = buildFakeSessions(initialWorkspaceId)
     }
   }
 
@@ -124,9 +124,10 @@ export default async function FamilyPage() {
   }
 
   return (
-    <FamilyDashboardClient
-      groups={groups}
-      initialGroupId={initialGroupId}
+    <WorkspaceDashboardClient
+      surface="ff"
+      workspaces={workspaces}
+      initialWorkspaceId={initialWorkspaceId}
       initialSessions={initialSessions}
       usingFakeSessions={usingFakeSessions}
       currentUser={currentUser}

@@ -3,9 +3,34 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { AuraBackground } from '@/components/AuraBackground'
-import type { WorkspaceSessionSummary, WorkspaceStats } from '../../../_lib/schema'
+import type { WorkspaceSessionSummary, WorkspaceStats } from '@/app/workspaces/_lib/schema'
 
 type FilterTab = 'all' | 'active' | 'closed'
+type WorkspaceType = 'standard' | 'ff'
+
+// Copy/route/accent treatment per workspace.type — same pattern as
+// WorkspaceDashboardClient's THEME/SURFACE_CHROME. base picks which
+// top-level surface route (/workspaces or /family) this session's links
+// resolve under.
+const OVERVIEW_THEME: Record<
+  WorkspaceType,
+  { base: string; backLabel: string; accentBtnClass: string; tabActiveClass: string; createLabel: string }
+> = {
+  standard: {
+    base: '/workspaces',
+    backLabel: 'Back to workspace',
+    accentBtnClass: 'bg-accent text-accent-foreground',
+    tabActiveClass: 'bg-accent text-accent-foreground',
+    createLabel: '+ Create Session',
+  },
+  ff: {
+    base: '/family',
+    backLabel: 'Back to group',
+    accentBtnClass: 'bg-fuchsia-500 text-white',
+    tabActiveClass: 'bg-fuchsia-500 text-white',
+    createLabel: '+ Create Poll',
+  },
+}
 
 const STATUS_META: Record<
   WorkspaceSessionSummary['status'],
@@ -110,6 +135,7 @@ function SessionCard({ session }: { session: WorkspaceSessionSummary }) {
 export function WorkspaceOverviewClient({
   workspaceId,
   workspaceName,
+  workspaceType,
   isAuthorized,
   errorMessage,
   stats,
@@ -117,11 +143,13 @@ export function WorkspaceOverviewClient({
 }: {
   workspaceId: string
   workspaceName: string
+  workspaceType: WorkspaceType
   isAuthorized: boolean
   errorMessage?: string
   stats: WorkspaceStats | null
   sessions: WorkspaceSessionSummary[]
 }) {
+  const theme = OVERVIEW_THEME[workspaceType]
   const [tab, setTab] = useState<FilterTab>('all')
 
   const filtered = sessions.filter((session) => {
@@ -135,8 +163,8 @@ export function WorkspaceOverviewClient({
       <AuraBackground />
 
       <div className="relative mx-auto max-w-6xl">
-        <Link href={`/workspaces/${workspaceId}`} className="text-sm text-muted transition hover:text-foreground">
-          ← Back to workspace
+        <Link href={`${theme.base}/${workspaceId}`} className="text-sm text-muted transition hover:text-foreground">
+          ← {theme.backLabel}
         </Link>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
@@ -146,10 +174,10 @@ export function WorkspaceOverviewClient({
           </div>
 
           <Link
-            href={`/sessions/create?workspaceId=${workspaceId}&workspaceType=standard`}
-            className="rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground transition hover:opacity-90"
+            href={`/sessions/create?workspaceId=${workspaceId}&workspaceType=${workspaceType}`}
+            className={`rounded-full px-4 py-2.5 text-sm font-medium transition hover:opacity-90 ${theme.accentBtnClass}`}
           >
-            + Create Session
+            {theme.createLabel}
           </Link>
         </div>
 
@@ -172,9 +200,11 @@ export function WorkspaceOverviewClient({
               />
               <StatCard
                 label="Average Turnout"
-                value={stats?.averageTurnout === null || stats?.averageTurnout === undefined
-                  ? '—'
-                  : `${Math.round(stats.averageTurnout * 10) / 10}%`}
+                value={
+                  stats?.averageTurnout === null || stats?.averageTurnout === undefined
+                    ? '—'
+                    : `${Math.round(stats.averageTurnout * 10) / 10}%`
+                }
                 trend={{ value: stats?.trends?.averageTurnout, isPercent: true }}
               />
               <StatCard label="Active Sessions" value={(stats?.activeSessions ?? 0).toLocaleString()} />
@@ -189,9 +219,7 @@ export function WorkspaceOverviewClient({
                     type="button"
                     onClick={() => setTab(t)}
                     className={`rounded-full px-3 py-1.5 font-medium capitalize transition ${
-                      tab === t
-                        ? 'bg-accent text-accent-foreground'
-                        : 'text-muted hover:bg-foreground/5 hover:text-foreground'
+                      tab === t ? theme.tabActiveClass : 'text-muted hover:bg-foreground/5 hover:text-foreground'
                     }`}
                   >
                     {t}

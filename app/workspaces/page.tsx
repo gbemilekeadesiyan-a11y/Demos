@@ -7,7 +7,7 @@ import { listSessions } from '../sessions/_lib/actions'
 import type { VotingSession } from '../sessions/_lib/schema'
 import { listNotifications } from '../notifications/_lib/actions'
 import type { Notification } from '../notifications/_lib/schema'
-import { WorkspaceDashboardClient } from './_components/WorkspaceDashboardClient'
+import { WorkspaceDashboardClient } from '@/components/WorkspaceDashboardClient'
 
 function buildFakeSessions(workspaceId: string): VotingSession[] {
   const now = new Date().toISOString()
@@ -143,6 +143,7 @@ export default async function WorkspacesPage() {
 
   return (
     <WorkspaceDashboardClient
+      surface="workspaces"
       workspaces={workspaces}
       initialWorkspaceId={initialWorkspaceId}
       initialSessions={initialSessions}

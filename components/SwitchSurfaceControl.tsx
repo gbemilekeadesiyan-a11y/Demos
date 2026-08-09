@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { verifyPasswordForSwitch } from '@/app/(auth)/_lib/actions'
 
 const SURFACE_COPY = {
-  ff: { label: 'Friends & Family', href: '/family' },
-  workspaces: { label: 'Workspaces', href: '/workspaces' },
+  ff: { label: 'dēmos Friends & Family', href: '/family' },
+  workspaces: { label: 'dēmos Workspaces', href: '/workspaces' },
 } as const
 
 // Only rendered by the dashboard for a surface once its page has confirmed

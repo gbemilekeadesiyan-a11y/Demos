@@ -1,18 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { getWorkspaceDetails } from '../../workspaces/_lib/actions'
 import type { Workspace, WorkspaceMembership } from '../../workspaces/_lib/schema'
-import { FamilyDetailClient } from './_components/FamilyDetailClient'
+import { WorkspaceDetailClient } from '@/components/WorkspaceDetailClient'
 
 function buildFakeDetails(
-  groupId: string,
+  workspaceId: string,
   currentUserId: string | null
-): { group: Workspace; members: WorkspaceMembership[]; pendingRequests: WorkspaceMembership[] } {
+): { workspace: Workspace; members: WorkspaceMembership[]; pendingRequests: WorkspaceMembership[] } {
   const now = new Date().toISOString()
   const adminId = currentUserId ?? 'fake-admin'
 
   return {
-    group: {
-      id: groupId,
+    workspace: {
+      id: workspaceId,
       name: 'The Family Chat',
       type: 'ff',
       createdBy: { id: adminId, username: 'you', firstName: 'You', lastName: '' },
@@ -21,7 +21,7 @@ function buildFakeDetails(
     members: [
       {
         id: 'fake-m1',
-        workspace_id: groupId,
+        workspace_id: workspaceId,
         user_id: adminId,
         role: 'admin',
         status: 'active',
@@ -30,7 +30,7 @@ function buildFakeDetails(
       },
       {
         id: 'fake-m2',
-        workspace_id: groupId,
+        workspace_id: workspaceId,
         user_id: 'fake-user-2',
         role: 'member',
         status: 'active',
@@ -50,7 +50,7 @@ export default async function FamilyDetailPage({ params }: { params: Promise<{ i
     data: { user },
   } = await supabase.auth.getUser()
 
-  let details: { group: Workspace; members: WorkspaceMembership[]; pendingRequests: WorkspaceMembership[] }
+  let details: { workspace: Workspace; members: WorkspaceMembership[]; pendingRequests: WorkspaceMembership[] }
   let usingFakeData = false
 
   try {
@@ -59,7 +59,7 @@ export default async function FamilyDetailPage({ params }: { params: Promise<{ i
       throw new Error(result.error ?? 'Could not load group')
     }
     details = {
-      group: result.workspace,
+      workspace: result.workspace,
       members: result.members,
       pendingRequests: result.pendingRequests ?? [],
     }
@@ -71,9 +71,9 @@ export default async function FamilyDetailPage({ params }: { params: Promise<{ i
   const isAdmin = details.members.some((member) => member.user_id === user?.id && member.role === 'admin')
 
   return (
-    <FamilyDetailClient
-      groupId={id}
-      group={details.group}
+    <WorkspaceDetailClient
+      workspaceId={id}
+      workspace={details.workspace}
       initialMembers={details.members}
       initialPendingRequests={details.pendingRequests}
       isAdmin={isAdmin}
