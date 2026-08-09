@@ -76,6 +76,7 @@ export default async function FamilyDetailPage({ params }: { params: Promise<{ i
     <WorkspaceDetailClient
       workspaceId={id}
       workspace={details.workspace}
+      currentUserId={user?.id ?? null}
       initialMembers={details.members}
       initialPendingRequests={details.pendingRequests}
       isAdmin={isAdmin}

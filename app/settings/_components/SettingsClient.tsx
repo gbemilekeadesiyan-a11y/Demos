@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
 import { changePassword, deleteAccount, updateEmail, updateProfile } from '../../(auth)/_lib/actions'
+import { getWorkspaceDetails, leaveWorkspace, transferOwnership } from '../../workspaces/_lib/actions'
+import type { Workspace } from '../../workspaces/_lib/schema'
 
 const inputClass =
   'rounded-lg border border-border bg-surface/80 px-4 py-3 text-sm text-foreground placeholder-muted outline-none backdrop-blur-sm focus:border-border-strong'
@@ -19,15 +21,19 @@ const PASSWORD_RULES: { label: string; test: (password: string) => boolean }[] =
 ]
 
 export function SettingsClient({
+  currentUserId,
   email,
   username,
   firstName,
   lastName,
+  memberships,
 }: {
+  currentUserId: string
   email: string
   username: string
   firstName: string
   lastName: string
+  memberships: Workspace[]
 }) {
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 py-12">
@@ -49,9 +55,220 @@ export function SettingsClient({
           initialEmail={email}
         />
         <ChangePasswordSection />
+        <WorkspacesAndGroupsSection currentUserId={currentUserId} memberships={memberships} />
         <DeleteAccountSection username={username} />
       </div>
     </main>
+  )
+}
+
+function WorkspacesAndGroupsSection({
+  currentUserId,
+  memberships,
+}: {
+  currentUserId: string
+  memberships: Workspace[]
+}) {
+  return (
+    <SectionCard title="Your workspaces & groups">
+      {memberships.length === 0 ? (
+        <p className="text-xs text-muted">You&apos;re not in any workspaces or groups yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {memberships.map((workspace) => (
+            <MembershipRow key={workspace.id} currentUserId={currentUserId} workspace={workspace} />
+          ))}
+        </ul>
+      )}
+    </SectionCard>
+  )
+}
+
+function MembershipRow({ currentUserId, workspace }: { currentUserId: string; workspace: Workspace }) {
+  const router = useRouter()
+  const isOwner = workspace.createdBy?.id === currentUserId
+  const isFf = workspace.type === 'ff'
+  const leaveLabel = isFf ? 'Leave group' : 'Leave workspace'
+
+  const [confirming, setConfirming] = useState(false)
+  const [leaving, setLeaving] = useState(false)
+  const [leaveError, setLeaveError] = useState<string | null>(null)
+  const [left, setLeft] = useState(false)
+
+  const [transferring, setTransferring] = useState(false)
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [otherMembers, setOtherMembers] = useState<{ userId: string; label: string }[] | null>(null)
+  const [selectedNewOwner, setSelectedNewOwner] = useState('')
+  const [transferLoading, setTransferLoading] = useState(false)
+  const [transferError, setTransferError] = useState<string | null>(null)
+  const [transferred, setTransferred] = useState(false)
+
+  async function handleLeaveClick() {
+    setLeaveError(null)
+
+    if (isOwner) {
+      setTransferring(true)
+      setMembersLoading(true)
+      const result = await getWorkspaceDetails(workspace.id)
+      setMembersLoading(false)
+      if (result.success) {
+        setOtherMembers(
+          (result.members ?? [])
+            .filter((member) => member.user_id !== currentUserId)
+            .map((member) => ({
+              userId: member.user_id,
+              label: member.user
+                ? `${member.user.firstName} ${member.user.lastName}`.trim() || member.user.username
+                : `Guest ${member.user_id.slice(0, 8)}`,
+            }))
+        )
+      }
+      return
+    }
+
+    setConfirming(true)
+  }
+
+  async function handleConfirmLeave() {
+    setLeaving(true)
+    setLeaveError(null)
+    const result = await leaveWorkspace(workspace.id)
+    setLeaving(false)
+
+    if (!result.success) {
+      setLeaveError(result.error ?? 'Could not leave')
+      return
+    }
+
+    setLeft(true)
+  }
+
+  async function handleTransfer() {
+    if (!selectedNewOwner) return
+
+    setTransferLoading(true)
+    setTransferError(null)
+    const result = await transferOwnership(workspace.id, selectedNewOwner)
+    setTransferLoading(false)
+
+    if (!result.success) {
+      setTransferError(result.error ?? 'Could not transfer ownership')
+      return
+    }
+
+    setTransferred(true)
+    setTransferring(false)
+    router.refresh()
+  }
+
+  if (left) {
+    return (
+      <li className="rounded-lg border border-border bg-surface/80 px-4 py-3 text-xs text-muted">
+        You left {workspace.name}.
+      </li>
+    )
+  }
+
+  return (
+    <li className="rounded-lg border border-border bg-surface/80 px-4 py-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm text-foreground">{workspace.name}</p>
+          <p className="text-xs text-muted">
+            {isFf ? 'Friends & Family group' : 'Workspace'}
+            {isOwner && !transferred ? ' · Owner' : ''}
+          </p>
+        </div>
+        {!confirming && !transferring && (
+          <button
+            type="button"
+            onClick={handleLeaveClick}
+            className="shrink-0 rounded-full border border-border-strong px-3 py-1.5 text-xs text-muted transition hover:border-red-400 hover:text-red-400"
+          >
+            {leaveLabel}
+          </button>
+        )}
+      </div>
+
+      {confirming && (
+        <div className="mt-3 rounded-lg border border-red-900/40 bg-red-950/10 p-3">
+          <p className="text-xs text-muted">
+            Are you sure you want to {leaveLabel.toLowerCase()} &quot;{workspace.name}&quot;? You&apos;ll lose
+            access to its sessions.
+          </p>
+          {leaveError && <p className="mt-2 text-xs text-red-400">{leaveError}</p>}
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={handleConfirmLeave}
+              disabled={leaving}
+              className="rounded-full bg-red-600 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-red-500 disabled:opacity-50"
+            >
+              {leaving ? 'Leaving…' : 'Confirm leave'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming(false)
+                setLeaveError(null)
+              }}
+              className="rounded-full border border-border-strong px-3 py-1.5 text-xs text-muted transition hover:border-foreground/40"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {transferring && (
+        <div className="mt-3 rounded-lg border border-amber-900/40 bg-amber-950/10 p-3">
+          <p className="text-xs font-medium text-amber-400">Transfer ownership before leaving.</p>
+
+          {membersLoading ? (
+            <p className="mt-2 text-xs text-muted">Loading members…</p>
+          ) : otherMembers && otherMembers.length > 0 ? (
+            <>
+              <select
+                value={selectedNewOwner}
+                onChange={(e) => setSelectedNewOwner(e.target.value)}
+                className="mt-2 w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs text-foreground outline-none focus:border-border-strong"
+              >
+                <option value="">Select a new owner…</option>
+                {otherMembers.map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.label}
+                  </option>
+                ))}
+              </select>
+              {transferError && <p className="mt-2 text-xs text-red-400">{transferError}</p>}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleTransfer}
+                  disabled={!selectedNewOwner || transferLoading}
+                  className="rounded-full bg-amber-500 px-3 py-1.5 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {transferLoading ? 'Transferring…' : 'Transfer Ownership'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTransferring(false)}
+                  className="rounded-full border border-border-strong px-3 py-1.5 text-xs text-muted transition hover:border-foreground/40"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="mt-2 text-xs text-muted">No other active members to transfer ownership to.</p>
+          )}
+        </div>
+      )}
+
+      {transferred && (
+        <p className="mt-2 text-xs text-emerald-400">Ownership transferred — you can now leave.</p>
+      )}
+    </li>
   )
 }
 

@@ -82,3 +82,9 @@ export type WorkspaceGroup = {
   name: string
   created_at: string
 }
+
+// Returned by listDepartments — memberIds is workspace_group_members'
+// membership_id column (a workspace_memberships.id, not a bare user id;
+// see 018_departments.sql), fetched via one embedded query per workspace
+// rather than a per-department round trip.
+export type DepartmentWithMembers = WorkspaceGroup & { memberIds: string[] }

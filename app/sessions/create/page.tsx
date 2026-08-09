@@ -1,13 +1,15 @@
 'use client'
 
-import { Suspense, useState, type FormEvent } from 'react'
+import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
-import { addSessionOption, createVotingSession } from '../_lib/actions'
+import { addSessionOption, createVotingSession, grantSessionAccess } from '../_lib/actions'
+import { listDepartments } from '@/app/workspaces/_lib/actions'
+import type { DepartmentWithMembers } from '@/app/workspaces/_lib/schema'
 
 type VoteFormat = 'single' | 'multiple' | 'ranked'
 type Visibility = 'public' | 'private'
-type WhoCanVote = 'all_members' | 'invited_list' | 'public_link'
+type WhoCanVote = 'all_members' | 'invited_list' | 'public_link' | 'departments'
 type ResultsVisibility = 'hidden_until_close' | 'live' | 'after_you_vote'
 type BallotSecrecy = 'secret' | 'open'
 
@@ -88,6 +90,8 @@ function CreateSessionForm() {
 
   const [visibility, setVisibility] = useState<Visibility>('public')
   const [whoCanVote, setWhoCanVote] = useState<WhoCanVote>('all_members')
+  const [departments, setDepartments] = useState<DepartmentWithMembers[]>([])
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState<string[]>([])
   const [allowAnonymousVote, setAllowAnonymousVote] = useState(false)
   const [resultsVisibility, setResultsVisibility] = useState<ResultsVisibility>('hidden_until_close')
   // Default by workspace type, per supabase/migrations/014_ballot_secrecy.sql
@@ -99,6 +103,33 @@ function CreateSessionForm() {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Departments are Workspaces-only (018_departments.sql) — fetched purely
+  // to populate the multi-select below, not shown at all for ff.
+  useEffect(() => {
+    if (!workspaceId || isFf) return
+
+    let cancelled = false
+
+    async function loadDepartments() {
+      const result = await listDepartments(workspaceId!)
+      if (!cancelled && result.success) {
+        setDepartments(result.departments ?? [])
+      }
+    }
+
+    loadDepartments()
+
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceId, isFf])
+
+  function toggleDepartment(id: string) {
+    setSelectedDepartmentIds((current) =>
+      current.includes(id) ? current.filter((deptId) => deptId !== id) : [...current, id]
+    )
+  }
 
   function updateOption(index: number, patch: Partial<OptionDraft>) {
     setOptions((current) => current.map((option, i) => (i === index ? { ...option, ...patch } : option)))
@@ -124,6 +155,11 @@ function CreateSessionForm() {
     const filledOptions = options.filter((option) => option.label.trim().length > 0)
     if (filledOptions.length < 2) {
       setError('Add at least two options.')
+      return
+    }
+
+    if (whoCanVote === 'departments' && selectedDepartmentIds.length === 0) {
+      setError('Select at least one department.')
       return
     }
 
@@ -159,6 +195,17 @@ function CreateSessionForm() {
         setLoading(false)
         setError(optionResult.error ?? 'Could not add one of the options')
         return
+      }
+    }
+
+    if (whoCanVote === 'departments') {
+      for (const departmentId of selectedDepartmentIds) {
+        const grantResult = await grantSessionAccess(sessionResult.sessionId, { departmentId })
+        if (!grantResult.success) {
+          setLoading(false)
+          setError(grantResult.error ?? 'Could not grant access to one of the departments')
+          return
+        }
       }
     }
 
@@ -316,8 +363,34 @@ function CreateSessionForm() {
                   <option value="all_members">All members</option>
                   {!isFf && <option value="invited_list">Invited list</option>}
                   <option value="public_link">Public link</option>
+                  {!isFf && <option value="departments">Specific departments</option>}
                 </select>
               </div>
+
+              {whoCanVote === 'departments' && (
+                <div className="rounded-lg border border-border bg-surface/60 p-3">
+                  <p className="mb-2 text-xs text-muted">Departments who can vote</p>
+                  {departments.length === 0 ? (
+                    <p className="text-xs text-subtle">
+                      No departments yet — add some from the workspace&apos;s Departments section first.
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-1.5">
+                      {departments.map((department) => (
+                        <label key={department.id} className="flex items-center gap-2 text-xs text-muted">
+                          <input
+                            type="checkbox"
+                            checked={selectedDepartmentIds.includes(department.id)}
+                            onChange={() => toggleDepartment(department.id)}
+                            className="h-3.5 w-3.5 rounded border-border-strong bg-surface"
+                          />
+                          {department.name}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <select
                 value={resultsVisibility}

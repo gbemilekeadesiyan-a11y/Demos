@@ -4,11 +4,20 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { respondToInvite } from '@/app/workspaces/_lib/actions'
 import { markAllNotificationsRead, markNotificationRead } from '../_lib/actions'
 import type { Notification } from '../_lib/schema'
 
 type Tab = 'all' | 'unread'
-type NotificationKind = 'vote' | 'results' | 'invite' | 'default'
+// 'direct_invite' (an admin invited you — respond with Accept/Decline,
+// handled inline here) is deliberately distinct from 'invite'
+// (workspace_invite_created — an admin generated a shareable code, purely
+// informational). They're opposite directions: 'direct_invite' asks
+// something of the recipient, 'invite' doesn't. The admin-approval
+// direction (someone asked to join, an admin approves/rejects) has no
+// notification at all today — that flow lives entirely in the Pending
+// requests section on the workspace/group detail page.
+type NotificationKind = 'vote' | 'results' | 'invite' | 'direct_invite' | 'default'
 
 function BellIcon({ className }: { className?: string }) {
   return (
@@ -78,6 +87,24 @@ function InviteIcon({ className }: { className?: string }) {
   )
 }
 
+function PersonCheckIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="9" cy="8" r="3.5" />
+      <path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" />
+      <path d="m15.5 12 1.75 1.75L21 10" />
+    </svg>
+  )
+}
+
 function CloseIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -124,6 +151,14 @@ function describeNotification(n: Notification): {
         kind: 'invite',
         title: 'New invite created',
         description: 'A new invite link was generated for your workspace.',
+        href: `/workspaces/${payload.workspaceId}`,
+        actionLabel: 'View',
+      }
+    case 'workspace_direct_invite':
+      return {
+        kind: 'direct_invite',
+        title: "You've been invited",
+        description: `An admin invited you to join as ${payload.role ?? 'a member'}.`,
         href: `/workspaces/${payload.workspaceId}`,
         actionLabel: 'View',
       }
@@ -193,6 +228,15 @@ export function NotificationBell({
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
   const triggerRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+
+  // Local-only resolution state for direct-invite cards — respondToInvite
+  // mutates workspace_memberships (the source of truth), not the
+  // notification row itself, so there's no server-side "resolved" status
+  // to read back; this just swaps the Accept/Decline buttons for a result
+  // label after a successful response, for this session's view of the list.
+  const [respondingId, setRespondingId] = useState<string | null>(null)
+  const [responded, setResponded] = useState<Record<string, 'accepted' | 'declined'>>({})
+  const [respondErrors, setRespondErrors] = useState<Record<string, string>>({})
 
   const unreadCount = notifications.filter((n) => !n.read).length
 
@@ -291,6 +335,26 @@ export function NotificationBell({
     await markAllNotificationsRead()
   }
 
+  async function handleRespondToInvite(n: Notification, accept: boolean) {
+    const membershipId = (n.payload as Record<string, unknown>).membershipId
+    if (typeof membershipId !== 'string') return
+
+    setRespondingId(n.id)
+    setRespondErrors((current) => ({ ...current, [n.id]: '' }))
+
+    const result = await respondToInvite(membershipId, accept)
+
+    setRespondingId(null)
+
+    if (!result.success) {
+      setRespondErrors((current) => ({ ...current, [n.id]: result.error ?? 'Could not respond to invite' }))
+      return
+    }
+
+    setResponded((current) => ({ ...current, [n.id]: accept ? 'accepted' : 'declined' }))
+    if (!n.read) handleMarkRead(n.id)
+  }
+
   if (!userId) return null
 
   const visible = tab === 'unread' ? notifications.filter((n) => !n.read) : notifications
@@ -377,10 +441,17 @@ export function NotificationBell({
                             className={`rounded-xl px-2 py-2.5 transition ${!n.read ? 'bg-foreground/5' : ''}`}
                           >
                             <div className="flex gap-3">
-                              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-muted">
+                              <span
+                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
+                                  view.kind === 'direct_invite'
+                                    ? 'border-sky-500/30 bg-sky-500/10 text-sky-400'
+                                    : 'border-border bg-surface text-muted'
+                                }`}
+                              >
                                 {view.kind === 'vote' && <VoteIcon className="h-4 w-4" />}
                                 {view.kind === 'results' && <ResultsIcon className="h-4 w-4" />}
                                 {view.kind === 'invite' && <InviteIcon className="h-4 w-4" />}
+                                {view.kind === 'direct_invite' && <PersonCheckIcon className="h-4 w-4" />}
                                 {view.kind === 'default' && <BellIcon className="h-4 w-4" />}
                               </span>
                               <div className="min-w-0 flex-1">
@@ -393,26 +464,62 @@ export function NotificationBell({
                                 <p className="mt-0.5 text-xs text-muted">{view.description}</p>
                                 <p className="mt-1 text-[11px] text-subtle">{formatTimestamp(n.created_at)}</p>
                                 <div className="mt-2 flex items-center gap-3 text-xs">
-                                  <Link
-                                    href={view.href}
-                                    onClick={() => {
-                                      if (!n.read) handleMarkRead(n.id)
-                                      setOpen(false)
-                                    }}
-                                    className="rounded-full border border-border px-2.5 py-1 text-foreground transition hover:border-border-strong"
-                                  >
-                                    {view.actionLabel}
-                                  </Link>
-                                  {!n.read && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleMarkRead(n.id)}
-                                      className="text-muted transition hover:text-foreground"
-                                    >
-                                      Mark as read
-                                    </button>
+                                  {view.kind === 'direct_invite' ? (
+                                    responded[n.id] ? (
+                                      <span
+                                        className={
+                                          responded[n.id] === 'accepted' ? 'text-emerald-400' : 'text-muted'
+                                        }
+                                      >
+                                        {responded[n.id] === 'accepted' ? 'Joined' : 'Declined'}
+                                      </span>
+                                    ) : (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRespondToInvite(n, true)}
+                                          disabled={respondingId === n.id}
+                                          className="rounded-full bg-emerald-500 px-2.5 py-1 font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                                        >
+                                          Accept
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRespondToInvite(n, false)}
+                                          disabled={respondingId === n.id}
+                                          className="rounded-full border border-border px-2.5 py-1 text-muted transition hover:border-border-strong disabled:opacity-50"
+                                        >
+                                          Decline
+                                        </button>
+                                      </>
+                                    )
+                                  ) : (
+                                    <>
+                                      <Link
+                                        href={view.href}
+                                        onClick={() => {
+                                          if (!n.read) handleMarkRead(n.id)
+                                          setOpen(false)
+                                        }}
+                                        className="rounded-full border border-border px-2.5 py-1 text-foreground transition hover:border-border-strong"
+                                      >
+                                        {view.actionLabel}
+                                      </Link>
+                                      {!n.read && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleMarkRead(n.id)}
+                                          className="text-muted transition hover:text-foreground"
+                                        >
+                                          Mark as read
+                                        </button>
+                                      )}
+                                    </>
                                   )}
                                 </div>
+                                {view.kind === 'direct_invite' && respondErrors[n.id] && (
+                                  <p className="mt-1 text-[11px] text-red-400">{respondErrors[n.id]}</p>
+                                )}
                               </div>
                             </div>
                           </div>

@@ -3,7 +3,13 @@
 import { randomBytes } from 'crypto'
 import { createClient } from '../../../lib/supabase/server'
 import type { UserSummary } from '../../(auth)/_lib/schema'
-import type { Workspace, WorkspaceGroup, WorkspaceMembership, WorkspaceSessionSummary, WorkspaceStats } from './schema'
+import type {
+  DepartmentWithMembers,
+  Workspace,
+  WorkspaceMembership,
+  WorkspaceSessionSummary,
+  WorkspaceStats,
+} from './schema'
 
 type ProfileRow = { id: string; username: string; first_name: string; last_name: string }
 
@@ -495,13 +501,16 @@ export async function deleteDepartment(groupId: string): Promise<{ success: bool
 export async function listDepartments(workspaceId: string): Promise<{
   success: boolean
   error?: string
-  departments?: WorkspaceGroup[]
+  departments?: DepartmentWithMembers[]
 }> {
   const supabase = await createClient()
 
+  // Embeds workspace_group_members in the same query (one round trip for
+  // every department's roster) rather than a listDepartmentMembers call
+  // per department.
   const { data, error } = await supabase
     .from('workspace_groups')
-    .select('id, workspace_id, name, created_at')
+    .select('id, workspace_id, name, created_at, workspace_group_members (membership_id)')
     .eq('workspace_id', workspaceId)
     .order('name')
 
@@ -509,7 +518,23 @@ export async function listDepartments(workspaceId: string): Promise<{
     return { success: false, error: error.message }
   }
 
-  return { success: true, departments: (data ?? []) as WorkspaceGroup[] }
+  type Row = {
+    id: string
+    workspace_id: string
+    name: string
+    created_at: string
+    workspace_group_members: { membership_id: string }[]
+  }
+
+  const departments: DepartmentWithMembers[] = ((data ?? []) as unknown as Row[]).map((row) => ({
+    id: row.id,
+    workspace_id: row.workspace_id,
+    name: row.name,
+    created_at: row.created_at,
+    memberIds: row.workspace_group_members.map((member) => member.membership_id),
+  }))
+
+  return { success: true, departments }
 }
 
 // membershipId, not userId — department membership is scoped to the
@@ -559,5 +584,67 @@ export async function getWorkspaceDetails(workspaceId: string): Promise<{
   members?: WorkspaceMembership[]
   pendingRequests?: WorkspaceMembership[]
 }> {
-  throw new Error('not implemented')
+  const supabase = await createClient()
+
+  const { data: workspaceRow, error: workspaceError } = await supabase
+    .from('workspaces')
+    .select('id, name, type, created_by, settings')
+    .eq('id', workspaceId)
+    .single()
+
+  if (workspaceError || !workspaceRow) {
+    return { success: false, error: workspaceError?.message ?? 'Workspace not found' }
+  }
+
+  // RLS ("Members and admins can view workspace memberships",
+  // 003_workspaces.sql) already scopes this per caller — a non-admin gets
+  // their own row (any status) plus every active row (the public roster);
+  // an admin additionally gets every pending row. No extra filtering on
+  // top of that is needed for "members" (active-only, below), but
+  // pendingRequests naturally comes back empty for a non-admin caller
+  // rather than needing an explicit admin check here.
+  const { data: membershipRows, error: membershipError } = await supabase
+    .from('workspace_memberships')
+    .select('id, workspace_id, user_id, role, status, initiated_by, created_at')
+    .eq('workspace_id', workspaceId)
+
+  if (membershipError) {
+    return { success: false, error: membershipError.message }
+  }
+
+  const rows = membershipRows ?? []
+  const profiles = await fetchUserSummaries(supabase, [workspaceRow.created_by, ...rows.map((row) => row.user_id)])
+
+  function toMembership(row: (typeof rows)[number]): WorkspaceMembership {
+    return {
+      id: row.id,
+      workspace_id: row.workspace_id,
+      user_id: row.user_id,
+      role: row.role,
+      status: row.status,
+      initiated_by: row.initiated_by,
+      created_at: row.created_at,
+      user: profiles.get(row.user_id) ?? null,
+    }
+  }
+
+  const members = rows.filter((row) => row.status === 'active').map(toMembership)
+
+  // Only 'self'-initiated pending rows (someone asked to join) belong here
+  // — 'admin'-initiated pending rows (a direct invite) are the invited
+  // user's own notification-driven accept/decline, not something an admin
+  // approves from this list. See approveMembership/rejectMembership.
+  const pendingRequests = rows
+    .filter((row) => row.status === 'pending' && row.initiated_by === 'self')
+    .map(toMembership)
+
+  const workspace: Workspace = {
+    id: workspaceRow.id,
+    name: workspaceRow.name,
+    type: workspaceRow.type,
+    settings: workspaceRow.settings as Record<string, unknown>,
+    createdBy: profiles.get(workspaceRow.created_by) ?? null,
+  }
+
+  return { success: true, workspace, members, pendingRequests }
 }

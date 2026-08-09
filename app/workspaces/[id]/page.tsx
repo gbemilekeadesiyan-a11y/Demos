@@ -98,6 +98,7 @@ export default async function WorkspaceDetailPage({ params }: { params: Promise<
     <WorkspaceDetailClient
       workspaceId={id}
       workspace={details.workspace}
+      currentUserId={user?.id ?? null}
       initialMembers={details.members}
       initialPendingRequests={details.pendingRequests}
       isAdmin={isAdmin}
