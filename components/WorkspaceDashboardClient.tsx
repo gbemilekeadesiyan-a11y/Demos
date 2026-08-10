@@ -453,7 +453,16 @@ export function WorkspaceDashboardClient({
                 {greetingPhrase()}, {currentUser?.firstName?.trim() || 'there'}!
               </p>
             )}
-            <h1 className="font-heading text-3xl text-foreground">{selectedWorkspace.name}</h1>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h1 className="font-heading text-3xl text-foreground">{selectedWorkspace.name}</h1>
+              <Link
+                href={`${surface === 'ff' ? '/family' : '/workspaces'}/${selectedWorkspace.id}`}
+                className="rounded-full border border-border px-4 py-2 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+              >
+                Members &amp; Invites
+              </Link>
+            </div>
 
             <div className="mt-6 flex gap-6 border-b border-divider text-sm">
               {(['active', 'drafts', 'history'] as Tab[]).map((t) => (
