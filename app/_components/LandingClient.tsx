@@ -6,11 +6,13 @@ import { AuraBackground } from '@/components/AuraBackground'
 import { Wordmark } from '@/components/Wordmark'
 import type { UserSummary } from '@/app/(auth)/_lib/schema'
 
+// In-page anchors, not separate routes — Product jumps to the screenshot in
+// the hero, Use Cases to the "How it works" walkthrough, About to the
+// footer. Pricing is gone; there's nothing to point it at yet.
 const NAV_LINKS = [
-  { href: '/product', label: 'Product' },
-  { href: '/use-cases', label: 'Use Cases' },
-  { href: '/pricing', label: 'Pricing' },
-  { href: '/about', label: 'About' },
+  { href: '#product', label: 'Product' },
+  { href: '#how-it-works', label: 'Use Cases' },
+  { href: '#footer', label: 'About' },
 ]
 
 function useScrolled(threshold = 40) {
@@ -364,18 +366,12 @@ const FOOTER_COLUMNS = [
   },
   {
     heading: 'Contact',
-    // Placeholder address — no real inbox behind this yet.
-    links: [{ href: 'mailto:hello@demos.app', label: 'hello@demos.app' }],
-  },
-  {
-    heading: 'Social',
-    // Not wired to real accounts yet — '#' rather than a fabricated URL.
     links: [
-      { href: '#', label: 'X' },
-      { href: '#', label: 'GitHub' },
-      { href: '#', label: 'LinkedIn' },
+      { href: 'mailto:gbemilekeadesiyan@gmail.com', label: 'gbemilekeadesiyan@gmail.com' },
+      { href: 'mailto:gabrielmasheke@gmail.com', label: 'gabrielmasheke@gmail.com' },
     ],
   },
+  // Social column removed for now — no real accounts to link to yet.
 ]
 
 function Footer() {
@@ -389,7 +385,7 @@ function Footer() {
   }
 
   return (
-    <footer className="border-t border-divider px-6 pb-8 pt-16 sm:px-10">
+    <footer id="footer" className="scroll-mt-20 border-t border-divider px-6 pb-8 pt-16 sm:px-10">
       <div className="mx-auto max-w-6xl">
         <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
           <div className="max-w-sm">
@@ -417,7 +413,7 @@ function Footer() {
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-8 text-xs">
+          <div className="grid grid-cols-2 gap-8 text-xs">
             {FOOTER_COLUMNS.map((column) => (
               <div key={column.heading}>
                 <p className="text-xs uppercase tracking-wide text-subtle">{column.heading}</p>
@@ -533,7 +529,10 @@ export function LandingClient({ currentUser }: { currentUser: UserSummary | null
           </div>
 
           {/* TODO: replace with a real product screenshot (recommend ~2400x1500, 16:10) */}
-          <div className="relative mx-auto mt-16 aspect-[16/10] w-full max-w-4xl overflow-hidden rounded-2xl border border-foreground/10 bg-foreground/5 shadow-2xl backdrop-blur-md">
+          <div
+            id="product"
+            className="relative mx-auto mt-16 aspect-[16/10] w-full max-w-4xl scroll-mt-24 overflow-hidden rounded-2xl border border-foreground/10 bg-foreground/5 shadow-2xl backdrop-blur-md"
+          >
             <div className="flex h-full items-center justify-center">
               <p className="text-sm text-subtle">Product screenshot coming soon</p>
             </div>
@@ -577,7 +576,7 @@ export function LandingClient({ currentUser }: { currentUser: UserSummary | null
         </section>
 
         {/* How it works */}
-        <section className="py-24 sm:py-32">
+        <section id="how-it-works" className="scroll-mt-20 py-24 sm:py-32">
           <SectionIntro
             eyebrow="How it works"
             title="From question to decision in minutes"
