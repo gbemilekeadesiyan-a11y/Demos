@@ -74,7 +74,7 @@ export function CreateWorkspaceForm({ type }: { type: 'standard' | 'ff' }) {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
-      <AuraBackground />
+      <AuraBackground variant={type === 'ff' ? 'ff' : 'default'} />
 
       <div className="relative w-full max-w-sm">
         <div className="flex flex-col items-center text-center">

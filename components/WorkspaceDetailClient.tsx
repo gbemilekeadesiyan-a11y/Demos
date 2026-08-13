@@ -493,7 +493,7 @@ export function WorkspaceDetailClient({
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 py-12">
-      <AuraBackground />
+      <AuraBackground variant={workspace.type === 'ff' ? 'ff' : 'default'} />
 
       <div className="relative mx-auto max-w-2xl">
         {usingFakeData && (

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import Link from 'next/link'
 import { AuraBackground } from '@/components/AuraBackground'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { Wordmark } from '@/components/Wordmark'
 import type { UserSummary } from '@/app/(auth)/_lib/schema'
 
@@ -473,6 +474,7 @@ export function LandingClient({ currentUser }: { currentUser: UserSummary | null
             </div>
 
             <div className="flex items-center gap-4 text-sm">
+              <ThemeToggle />
               {currentUser ? (
                 <HeaderAvatar user={currentUser} />
               ) : (

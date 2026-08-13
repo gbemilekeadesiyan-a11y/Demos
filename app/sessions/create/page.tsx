@@ -49,8 +49,12 @@ function emptyOption(): OptionDraft {
   return { label: '', description: '', imageUrl: '' }
 }
 
-function Eyebrow({ children }: { children: string }) {
-  return <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">{children}</p>
+function Eyebrow({ children, ff }: { children: string; ff: boolean }) {
+  return (
+    <p className={`text-xs font-semibold uppercase tracking-[0.2em] ${ff ? 'text-fuchsia-400' : 'text-accent'}`}>
+      {children}
+    </p>
+  )
 }
 
 function Toggle({
@@ -58,11 +62,13 @@ function Toggle({
   onChange,
   label,
   hint,
+  ff,
 }: {
   checked: boolean
   onChange: (checked: boolean) => void
   label: string
   hint?: string
+  ff: boolean
 }) {
   return (
     <label className="flex items-center justify-between gap-4 rounded-lg border border-border bg-surface/60 px-4 py-3">
@@ -77,7 +83,11 @@ function Toggle({
           onChange={(e) => onChange(e.target.checked)}
           className="peer sr-only"
         />
-        <span className="h-6 w-11 rounded-full bg-border-strong transition peer-checked:bg-accent" />
+        <span
+          className={`h-6 w-11 rounded-full bg-border-strong transition ${
+            ff ? 'peer-checked:bg-fuchsia-500' : 'peer-checked:bg-accent'
+          }`}
+        />
         <span className="absolute left-1 h-4 w-4 rounded-full bg-background transition peer-checked:translate-x-5" />
       </span>
     </label>
@@ -98,10 +108,12 @@ function Stepper({
   currentIndex,
   maxIndex,
   onSelect,
+  ff,
 }: {
   currentIndex: number
   maxIndex: number
   onSelect: (index: number) => void
+  ff: boolean
 }) {
   return (
     <div className="mt-8 flex items-center">
@@ -115,16 +127,22 @@ function Stepper({
             aria-current={index === currentIndex ? 'step' : undefined}
             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium transition ${
               index === currentIndex
-                ? 'bg-accent text-accent-foreground'
+                ? ff
+                  ? 'bg-fuchsia-500 text-white'
+                  : 'bg-accent text-accent-foreground'
                 : index < currentIndex
-                  ? 'bg-accent/20 text-accent'
+                  ? ff
+                    ? 'bg-fuchsia-500/20 text-fuchsia-300'
+                    : 'bg-accent/20 text-accent'
                   : 'bg-border-strong text-subtle'
             } ${index > maxIndex ? 'cursor-not-allowed' : 'cursor-pointer'}`}
           >
             {index < currentIndex ? '✓' : index + 1}
           </button>
           {index < STEPS.length - 1 && (
-            <div className={`h-px flex-1 ${index < currentIndex ? 'bg-accent' : 'bg-border'}`} />
+            <div
+              className={`h-px flex-1 ${index < currentIndex ? (ff ? 'bg-fuchsia-500' : 'bg-accent') : 'bg-border'}`}
+            />
           )}
         </Fragment>
       ))}
@@ -342,14 +360,14 @@ function CreateSessionForm() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 py-12">
-      <AuraBackground />
+      <AuraBackground variant={isFf ? 'ff' : 'default'} />
 
       <div className="relative mx-auto max-w-lg">
         <button onClick={() => router.back()} className="text-sm text-muted transition hover:text-foreground">
           ← Back
         </button>
 
-        <h1 className="mt-4 font-heading text-3xl text-foreground">Create a session</h1>
+        <h1 className="mt-4 font-heading text-3xl text-foreground">{isFf ? 'Create a poll' : 'Create a session'}</h1>
 
         {!workspaceId ? (
           <p className="mt-8 text-sm text-red-400">
@@ -366,14 +384,14 @@ function CreateSessionForm() {
           </p>
         ) : (
           <>
-            <Stepper currentIndex={stepIndex} maxIndex={maxStepIndex} onSelect={goToStep} />
+            <Stepper currentIndex={stepIndex} maxIndex={maxStepIndex} onSelect={goToStep} ff={isFf} />
 
             <form onSubmit={handleFormSubmit} className="mt-8">
               <div
                 key={step}
                 className="animate-[step-fade-in_0.35s_ease] rounded-2xl border border-foreground/10 bg-foreground/5 p-6 backdrop-blur-md sm:p-8"
               >
-                <Eyebrow>{STEP_META[step].eyebrow}</Eyebrow>
+                <Eyebrow ff={isFf}>{STEP_META[step].eyebrow}</Eyebrow>
                 <h2 className="mt-2 font-heading text-2xl text-foreground">{STEP_META[step].title}</h2>
 
                 <div className="mt-6">
@@ -406,7 +424,9 @@ function CreateSessionForm() {
                           onClick={() => setVoteFormat(format)}
                           className={`flex-1 rounded-lg border px-3 py-2 text-sm capitalize transition ${
                             voteFormat === format
-                              ? 'border-accent bg-accent text-accent-foreground'
+                              ? isFf
+                                ? 'border-fuchsia-400 bg-fuchsia-500 text-white'
+                                : 'border-accent bg-accent text-accent-foreground'
                               : 'border-border bg-surface/80 text-muted hover:border-border-strong'
                           }`}
                         >
@@ -559,6 +579,7 @@ function CreateSessionForm() {
                         onChange={setAllowAnonymousVote}
                         label="Enable anonymous voting"
                         hint="Your vote will not be disclosed to others."
+                        ff={isFf}
                       />
 
                       <div className="flex gap-3">
@@ -599,9 +620,19 @@ function CreateSessionForm() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 rounded-full bg-accent px-4 py-3 text-sm font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
+                  className={`flex-1 rounded-full px-4 py-3 text-sm font-medium transition hover:opacity-90 disabled:opacity-50 ${
+                    isFf ? 'bg-fuchsia-500 text-white' : 'bg-accent text-accent-foreground'
+                  }`}
                 >
-                  {step === 'settings' ? (loading ? 'Creating session…' : 'Create Session') : 'Continue'}
+                  {step === 'settings'
+                    ? loading
+                      ? isFf
+                        ? 'Creating poll…'
+                        : 'Creating session…'
+                      : isFf
+                        ? 'Create Poll'
+                        : 'Create Session'
+                    : 'Continue'}
                 </button>
               </div>
             </form>

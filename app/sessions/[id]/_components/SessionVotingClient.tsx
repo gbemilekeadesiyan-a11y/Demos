@@ -337,7 +337,7 @@ export function SessionVotingClient({
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-4 py-12">
-      <AuraBackground />
+      <AuraBackground variant={workspaceType === 'ff' ? 'ff' : 'default'} />
 
       <div className="relative mx-auto max-w-lg">
         <Link

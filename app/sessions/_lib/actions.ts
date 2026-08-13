@@ -1,6 +1,7 @@
 'use server'
 
 import { randomUUID } from 'crypto'
+import { revalidatePath } from 'next/cache'
 import { createClient } from '../../../lib/supabase/server'
 import type { UserSummary } from '../../(auth)/_lib/schema'
 import type { RankedRound, SessionOption, SessionVoter, VotingSession } from './schema'
@@ -317,6 +318,16 @@ async function transitionSessionStatus(
     // between the check above and this update (race), not a query error.
     return { success: false, error: 'Session status changed before this could complete — please retry' }
   }
+
+  // Without this, the dashboards' cached RSC payload (Next's client Router
+  // Cache, not anything Supabase-side) keeps showing this session under its
+  // old status until something else happens to bust it — e.g. a session
+  // just opened here would still look like a draft on /workspaces or
+  // /family for up to the cache's staleTime after navigating back.
+  // 'layout' also covers /workspaces/[id] and /workspaces/[id]/overview
+  // (same for /family), not just the two list roots.
+  revalidatePath('/workspaces', 'layout')
+  revalidatePath('/family', 'layout')
 
   return { success: true }
 }
