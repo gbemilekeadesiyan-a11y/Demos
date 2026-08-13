@@ -178,6 +178,7 @@ export async function createVotingSession(
     .single()
 
   if (error) {
+    console.log('[DIAG] insert error =', JSON.stringify(error))
     return { success: false, error: error.message }
   }
 
