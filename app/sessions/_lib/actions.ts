@@ -3,6 +3,7 @@
 import { createClient } from '../../../lib/supabase/server'
 import type { UserSummary } from '../../(auth)/_lib/schema'
 import type { RankedRound, SessionOption, SessionVoter, VotingSession } from './schema'
+import { tallyRankedChoice, tallySimpleChoice } from './tally'
 
 type ProfileRow = { id: string; username: string; first_name: string; last_name: string }
 
@@ -59,6 +60,54 @@ function toVotingSession(row: any, profiles: Map<string, UserSummary>): VotingSe
     createdBy: profiles.get(row.created_by) ?? null,
     created_at: row.created_at,
   }
+}
+
+// Mirrors the voting_sessions insert policy in
+// supabase/migrations/019_member_session_creation.sql, purely so the create
+// page (app/sessions/create/page.tsx) can show a clear "you can't do this"
+// message up front instead of letting a non-admin fill out the whole form
+// and hit a raw Postgres RLS error at submit time. RLS remains the actual
+// enforcement boundary — this is UX only.
+export async function canCreateSession(workspaceId: string): Promise<{
+  success: boolean
+  error?: string
+  allowed?: boolean
+}> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: workspace, error: workspaceError } = await supabase
+    .from('workspaces')
+    .select('type, settings')
+    .eq('id', workspaceId)
+    .single()
+
+  if (workspaceError || !workspace) {
+    return { success: false, error: workspaceError?.message ?? 'Workspace not found' }
+  }
+
+  const { data: membership } = await supabase
+    .from('workspace_memberships')
+    .select('role, status')
+    .eq('workspace_id', workspaceId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  const isActiveAdmin = membership?.status === 'active' && membership.role === 'admin'
+  const membersCanCreate =
+    workspace.type === 'ff' &&
+    Boolean((workspace.settings as Record<string, unknown> | null)?.membersCanCreateSessions)
+
+  const allowed = isActiveAdmin || (membersCanCreate && membership?.status === 'active')
+
+  return { success: true, allowed }
 }
 
 export async function createVotingSession(
@@ -582,127 +631,3 @@ export async function listSessionVoters(sessionId: string): Promise<{
   }
 }
 
-function tallySimpleChoice(
-  options: { id: string; label: string }[],
-  selections: { option_id: string }[]
-): { optionId: string; label: string; count: number }[] {
-  const counts = new Map(options.map((option) => [option.id, 0]))
-
-  for (const selection of selections) {
-    counts.set(selection.option_id, (counts.get(selection.option_id) ?? 0) + 1)
-  }
-
-  return options.map((option) => ({
-    optionId: option.id,
-    label: option.label,
-    count: counts.get(option.id) ?? 0,
-  }))
-}
-
-// Instant Runoff Voting, per demos-system-design.md § 8.3: tally first
-// choices, eliminate the lowest, redistribute those ballots to their
-// next-ranked remaining option, repeat until majority. Two behaviors the
-// design doc doesn't spell out, decided here:
-// - A ballot with no remaining ranked option left ("exhausted") is dropped
-//   from that round's count and from the majority denominator, rather than
-//   counted for no one — standard IRV practice.
-// - A tie for lowest eliminates all tied options in the same round, rather
-//   than picking one arbitrarily.
-// `finalCounts` is each option's tally in the last round it was still
-// standing (0 once eliminated). `rounds` is the same loop's per-iteration
-// history — one entry per round, `eliminated` empty on the round that ended
-// the loop (majority, one option left, or a full tie) — added for the
-// results leaderboard without changing the elimination/majority logic
-// itself, which is unchanged from before this was added.
-function tallyRankedChoice(
-  options: { id: string; label: string }[],
-  selections: { option_id: string; rank: number | null; vote_id: string }[]
-): {
-  finalCounts: { optionId: string; label: string; count: number }[]
-  rounds: RankedRound[]
-} {
-  const ballots = new Map<string, { optionId: string; rank: number }[]>()
-
-  for (const selection of selections) {
-    if (selection.rank === null) continue
-    const ballot = ballots.get(selection.vote_id) ?? []
-    ballot.push({ optionId: selection.option_id, rank: selection.rank })
-    ballots.set(selection.vote_id, ballot)
-  }
-
-  for (const ballot of ballots.values()) {
-    ballot.sort((a, b) => a.rank - b.rank)
-  }
-
-  const remaining = new Set(options.map((option) => option.id))
-  const finalCounts = new Map(options.map((option) => [option.id, 0]))
-  const rounds: RankedRound[] = []
-
-  function recordRound(roundCounts: Map<string, number>, eliminated: string[]) {
-    rounds.push({
-      roundNumber: rounds.length + 1,
-      counts: options.map((option) => ({
-        optionId: option.id,
-        label: option.label,
-        count: roundCounts.get(option.id) ?? 0,
-      })),
-      eliminated,
-    })
-  }
-
-  while (remaining.size > 0) {
-    const roundCounts = new Map<string, number>()
-    for (const id of remaining) roundCounts.set(id, 0)
-
-    let countedBallots = 0
-
-    for (const ballot of ballots.values()) {
-      const firstRemaining = ballot.find((choice) => remaining.has(choice.optionId))
-      if (!firstRemaining) continue
-      roundCounts.set(firstRemaining.optionId, (roundCounts.get(firstRemaining.optionId) ?? 0) + 1)
-      countedBallots += 1
-    }
-
-    for (const [id, count] of roundCounts) {
-      finalCounts.set(id, count)
-    }
-
-    const majorityThreshold = countedBallots / 2
-    const hasMajority = [...roundCounts.values()].some((count) => count > majorityThreshold)
-
-    if (hasMajority || remaining.size === 1) {
-      recordRound(roundCounts, [])
-      break
-    }
-
-    const lowestCount = Math.min(...roundCounts.values())
-    const toEliminate = [...roundCounts.entries()]
-      .filter(([, count]) => count === lowestCount)
-      .map(([id]) => id)
-
-    for (const id of toEliminate) {
-      remaining.delete(id)
-    }
-
-    if (remaining.size === 0) {
-      // Every remaining option tied for lowest — stop rather than wipe
-      // the board; finalCounts already holds this round's tallies.
-      for (const id of toEliminate) {
-        remaining.add(id)
-      }
-      recordRound(roundCounts, [])
-      break
-    }
-
-    recordRound(roundCounts, toEliminate)
-  }
-
-  return {
-    finalCounts: options.map((option) => ({
-      optionId: option.id,
-      label: option.label,
-      count: finalCounts.get(option.id) ?? 0,
-    })),
-    rounds,
-  }
-}

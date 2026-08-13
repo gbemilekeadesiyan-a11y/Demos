@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
-import { addSessionOption, createVotingSession, grantSessionAccess } from '../_lib/actions'
+import { addSessionOption, canCreateSession, createVotingSession, grantSessionAccess } from '../_lib/actions'
 import { listDepartments } from '@/app/workspaces/_lib/actions'
 import type { DepartmentWithMembers } from '@/app/workspaces/_lib/schema'
 
@@ -103,6 +103,36 @@ function CreateSessionForm() {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Gates the form on the same rule the database enforces (see
+  // canCreateSession / supabase/migrations/019_member_session_creation.sql):
+  // admins always, or any active member when an ff group has opted in via
+  // "members can create sessions". Checked up front so a non-admin sees a
+  // clear message instead of filling out the whole form and hitting a raw
+  // RLS error on submit. null while the check is in flight.
+  const [permission, setPermission] = useState<{ allowed: boolean; error?: string } | null>(null)
+
+  useEffect(() => {
+    if (!workspaceId) return
+
+    let cancelled = false
+
+    async function checkPermission() {
+      const result = await canCreateSession(workspaceId!)
+      if (cancelled) return
+      if (!result.success) {
+        setPermission({ allowed: false, error: result.error })
+        return
+      }
+      setPermission({ allowed: Boolean(result.allowed) })
+    }
+
+    checkPermission()
+
+    return () => {
+      cancelled = true
+    }
+  }, [workspaceId])
 
   // Departments are Workspaces-only (018_departments.sql) — fetched purely
   // to populate the multi-select below, not shown at all for ff.
@@ -226,6 +256,20 @@ function CreateSessionForm() {
 
         <h1 className="mt-4 font-heading text-3xl text-foreground">Create a session</h1>
 
+        {!workspaceId ? (
+          <p className="mt-8 text-sm text-red-400">
+            Missing workspace — open this page from a workspace to create a session.
+          </p>
+        ) : permission === null ? (
+          <p className="mt-8 text-sm text-muted">Checking permissions…</p>
+        ) : !permission.allowed ? (
+          <p className="mt-8 text-sm text-red-400">
+            {permission.error ??
+              (isFf
+                ? "Only this group's admins can create sessions here — ask an admin to enable member-created sessions, or to create one for you."
+                : 'Only workspace admins can create sessions.')}
+          </p>
+        ) : (
         <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-8">
           <div className="flex flex-col gap-3">
             <input
@@ -442,6 +486,7 @@ function CreateSessionForm() {
             {loading ? 'Creating session…' : 'Create Session'}
           </button>
         </form>
+        )}
       </div>
     </main>
   )

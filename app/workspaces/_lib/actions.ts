@@ -648,3 +648,39 @@ export async function getWorkspaceDetails(workspaceId: string): Promise<{
 
   return { success: true, workspace, members, pendingRequests }
 }
+
+// ff-only setting: lets an admin allow ordinary members to create voting
+// sessions too, not just admins. Stored in workspaces.settings — see
+// supabase/migrations/019_member_session_creation.sql, which is also where
+// this is actually enforced (RLS on voting_sessions' insert policy); this
+// action only controls the flag, and its own update is gated by the
+// existing "Admins can update their workspace" policy (003_workspaces.sql).
+export async function setMembersCanCreateSessions(
+  workspaceId: string,
+  allowed: boolean
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data: workspaceRow, error: fetchError } = await supabase
+    .from('workspaces')
+    .select('settings')
+    .eq('id', workspaceId)
+    .single()
+
+  if (fetchError || !workspaceRow) {
+    return { success: false, error: fetchError?.message ?? 'Workspace not found' }
+  }
+
+  const { error } = await supabase
+    .from('workspaces')
+    .update({
+      settings: { ...(workspaceRow.settings as Record<string, unknown>), membersCanCreateSessions: allowed },
+    })
+    .eq('id', workspaceId)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return { success: true }
+}

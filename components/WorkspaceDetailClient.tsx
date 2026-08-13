@@ -14,6 +14,7 @@ import {
   rejectMembership,
   removeMemberFromDepartment,
   renameDepartment,
+  setMembersCanCreateSessions,
   updateMemberRole,
 } from '@/app/workspaces/_lib/actions'
 import type { DepartmentWithMembers, Workspace, WorkspaceMembership } from '@/app/workspaces/_lib/schema'
@@ -410,6 +411,15 @@ export function WorkspaceDetailClient({
   const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [inviteLoading, setInviteLoading] = useState(false)
 
+  // ff-only: lets an admin allow ordinary members to create sessions too,
+  // not just admins. See supabase/migrations/019_member_session_creation.sql
+  // for the actual enforcement (RLS) — this toggle just flips the flag it
+  // reads.
+  const [membersCanCreateSessions, setMembersCanCreateSessionsState] = useState(
+    Boolean(workspace.settings?.membersCanCreateSessions)
+  )
+  const [sessionCreationSaving, setSessionCreationSaving] = useState(false)
+
   async function handleRoleChange(membershipId: string, role: RoleOption) {
     setError(null)
     const previous = members
@@ -457,6 +467,21 @@ export function WorkspaceDetailClient({
       return
     }
     setInviteCode(result.inviteCode)
+  }
+
+  async function handleToggleMembersCanCreateSessions(next: boolean) {
+    setError(null)
+    const previous = membersCanCreateSessions
+    setMembersCanCreateSessionsState(next)
+    setSessionCreationSaving(true)
+
+    const result = await setMembersCanCreateSessions(workspaceId, next)
+    setSessionCreationSaving(false)
+
+    if (!result.success) {
+      setMembersCanCreateSessionsState(previous)
+      setError(result.error ?? 'Could not update this setting')
+    }
   }
 
   const inviteLink =
@@ -574,6 +599,23 @@ export function WorkspaceDetailClient({
         )}
 
         {isAdmin && theme.showDepartments && <DepartmentsSection workspaceId={workspaceId} members={members} />}
+
+        {isAdmin && workspace.type === 'ff' && (
+          <section className={`mt-8 rounded-lg border p-4 ${theme.inviteSectionClass}`}>
+            <h2 className="text-sm font-medium text-muted">Session creation</h2>
+
+            <label className="mt-3 flex items-center gap-2 text-xs text-muted">
+              <input
+                type="checkbox"
+                checked={membersCanCreateSessions}
+                disabled={sessionCreationSaving}
+                onChange={(e) => handleToggleMembersCanCreateSessions(e.target.checked)}
+                className="h-3.5 w-3.5 rounded border-border-strong bg-surface"
+              />
+              Let any member create voting sessions, not just admins
+            </label>
+          </section>
+        )}
 
         {isAdmin && (
           <section className={`mt-8 rounded-lg border p-4 ${theme.inviteSectionClass}`}>
