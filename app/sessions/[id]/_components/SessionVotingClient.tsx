@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type DragEvent } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { AuraBackground } from '@/components/AuraBackground'
 import { castVote, closeSession, getSessionResults, listSessionVoters, openSession, releaseResults } from '../../_lib/actions'
@@ -339,13 +340,20 @@ export function SessionVotingClient({
       <AuraBackground />
 
       <div className="relative mx-auto max-w-lg">
+        <Link
+          href={workspaceType === 'ff' ? '/family' : '/workspaces'}
+          className="text-sm text-muted transition hover:text-foreground"
+        >
+          ← Back to dashboard
+        </Link>
+
         {usingFakeData && (
-          <p className="mb-6 rounded-lg border border-yellow-800 bg-yellow-950/50 px-4 py-2 text-xs text-yellow-400">
+          <p className="mb-6 mt-4 rounded-lg border border-yellow-800 bg-yellow-950/50 px-4 py-2 text-xs text-yellow-400">
             Showing placeholder data — getSessionDetails isn&apos;t returning a real session yet.
           </p>
         )}
 
-        <h1 className="font-heading text-3xl text-foreground">{session.title}</h1>
+        <h1 className="mt-4 font-heading text-3xl text-foreground">{session.title}</h1>
         {session.description && <p className="mt-2 text-sm text-muted">{session.description}</p>}
 
         {isAdmin && !usingFakeData && status !== 'results_released' && (
