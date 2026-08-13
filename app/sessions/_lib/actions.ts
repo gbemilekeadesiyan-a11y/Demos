@@ -1,5 +1,6 @@
 'use server'
 
+import { randomUUID } from 'crypto'
 import { createClient } from '../../../lib/supabase/server'
 import type { UserSummary } from '../../(auth)/_lib/schema'
 import type { RankedRound, SessionOption, SessionVoter, VotingSession } from './schema'
@@ -147,42 +148,39 @@ export async function createVotingSession(
     ballotSecrecy = workspace?.type === 'ff' ? 'open' : 'secret'
   }
 
-  // TEMP DIAGNOSTIC — remove after debugging the RLS violation
-  const { data: rpcCheck, error: rpcError } = await supabase.rpc('is_workspace_admin', {
-    target_workspace_id: workspaceId,
-  })
-  console.log('[DIAG] user.id =', user.id)
-  console.log('[DIAG] workspaceId =', workspaceId)
-  console.log('[DIAG] is_workspace_admin RPC result =', rpcCheck, 'error =', rpcError)
-  // END TEMP DIAGNOSTIC
-
   // RLS requires the caller to be an active admin of workspaceId — see
   // supabase/migrations/005_voting_sessions.sql.
-  const { data, error } = await supabase
-    .from('voting_sessions')
-    .insert({
-      workspace_id: workspaceId,
-      title: formData.title,
-      description: formData.description ?? null,
-      vote_format: formData.voteFormat,
-      visibility: formData.visibility,
-      who_can_vote: formData.whoCanVote,
-      allow_anonymous_vote: formData.allowAnonymousVote,
-      results_visibility: formData.resultsVisibility,
-      ballot_secrecy: ballotSecrecy,
-      start_time: formData.startTime ?? null,
-      end_time: formData.endTime ?? null,
-      created_by: user.id,
-    })
-    .select('id')
-    .single()
+  //
+  // id is generated here (not left to the column default) so this insert
+  // never needs `.select()`/RETURNING: Postgres checks a RETURNING row
+  // against the table's SELECT policy (can_access_session, which re-queries
+  // voting_sessions by id) before handing it back, and that self-lookup
+  // can't see a row this same statement is still in the middle of
+  // inserting — it always misses, turning every session creation into a
+  // false RLS violation regardless of who's creating it.
+  const sessionId = randomUUID()
+
+  const { error } = await supabase.from('voting_sessions').insert({
+    id: sessionId,
+    workspace_id: workspaceId,
+    title: formData.title,
+    description: formData.description ?? null,
+    vote_format: formData.voteFormat,
+    visibility: formData.visibility,
+    who_can_vote: formData.whoCanVote,
+    allow_anonymous_vote: formData.allowAnonymousVote,
+    results_visibility: formData.resultsVisibility,
+    ballot_secrecy: ballotSecrecy,
+    start_time: formData.startTime ?? null,
+    end_time: formData.endTime ?? null,
+    created_by: user.id,
+  })
 
   if (error) {
-    console.log('[DIAG] insert error =', JSON.stringify(error))
     return { success: false, error: error.message }
   }
 
-  return { success: true, sessionId: data.id }
+  return { success: true, sessionId }
 }
 
 export async function addSessionOption(
