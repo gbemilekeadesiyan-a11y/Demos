@@ -78,6 +78,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   }
 
   let workspaceType: 'standard' | 'ff' = 'standard'
+  let isAdmin = false
 
   if (!usingFakeData) {
     const { data: workspaceRow } = await supabase
@@ -88,6 +89,26 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
 
     if (workspaceRow?.type === 'ff') {
       workspaceType = 'ff'
+    }
+
+    // Gates the draft→open→closed→results_released lifecycle controls in
+    // SessionVotingClient — without this, a session created via
+    // createVotingSession (which defaults to 'draft') has no way to ever
+    // become votable from the UI.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (user) {
+      const { data: membership } = await supabase
+        .from('workspace_memberships')
+        .select('role')
+        .eq('workspace_id', session.workspace_id)
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle()
+
+      isAdmin = membership?.role === 'admin'
     }
   }
 
@@ -141,6 +162,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       initialVoters={voters}
       workspaceType={workspaceType}
       usingFakeData={usingFakeData}
+      isAdmin={isAdmin}
     />
   )
 }

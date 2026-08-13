@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { AuraBackground } from '@/components/AuraBackground'
-import { castVote, getSessionResults, listSessionVoters } from '../../_lib/actions'
+import { castVote, closeSession, getSessionResults, listSessionVoters, openSession, releaseResults } from '../../_lib/actions'
 import type { RankedRound, SessionOption, SessionVoter, VotingSession } from '../../_lib/schema'
 import { ResultsDisplay } from './ResultsDisplay'
 
@@ -93,6 +93,7 @@ export function SessionVotingClient({
   initialVoters,
   workspaceType,
   usingFakeData,
+  isAdmin,
 }: {
   sessionId: string
   session: VotingSession
@@ -106,8 +107,59 @@ export function SessionVotingClient({
   initialVoters: SessionVoter[]
   workspaceType: WorkspaceType
   usingFakeData: boolean
+  isAdmin: boolean
 }) {
   const theme = THEME[workspaceType]
+
+  // Tracked separately from `session` (otherwise unchanged) so the
+  // draft → open → closed → results_released lifecycle buttons below can
+  // update the page immediately after a transition, without a full reload.
+  const [status, setStatus] = useState(session.status)
+  const [lifecycleLoading, setLifecycleLoading] = useState(false)
+  const [lifecycleError, setLifecycleError] = useState<string | null>(null)
+
+  async function handleLifecycleAction() {
+    setLifecycleLoading(true)
+    setLifecycleError(null)
+
+    const result =
+      status === 'draft'
+        ? await openSession(sessionId)
+        : status === 'open'
+          ? await closeSession(sessionId)
+          : await releaseResults(sessionId)
+
+    if (!result.success) {
+      setLifecycleLoading(false)
+      setLifecycleError(result.error ?? 'Could not update this session')
+      return
+    }
+
+    const nextStatus = status === 'draft' ? 'open' : status === 'open' ? 'closed' : 'results_released'
+    setStatus(nextStatus)
+
+    // Closing/releasing can reveal results immediately for an admin who
+    // hasn't voted themselves (and so never hit the same reveal in
+    // handleSubmitVote below) — refetch and show them rather than leaving
+    // the page looking unchanged until a manual reload.
+    if (nextStatus !== 'open') {
+      const resultsResult = await getSessionResults(sessionId)
+      if (resultsResult.success) {
+        setResults(resultsResult.results ?? [])
+        setTotalVotes(resultsResult.totalVotes ?? 0)
+        setResultsLocked(resultsResult.resultsLocked ?? false)
+        setRounds(resultsResult.rounds ?? [])
+
+        if (!resultsResult.resultsLocked) {
+          const votersResult = await listSessionVoters(sessionId)
+          setVoters(votersResult.success ? (votersResult.voters ?? []) : [])
+        }
+      }
+      setShowResults(true)
+    }
+
+    setLifecycleLoading(false)
+  }
 
   const [hasVoted, setHasVoted] = useState(initialHasVoted)
   const [showResults, setShowResults] = useState(initialShowResults)
@@ -228,7 +280,7 @@ export function SessionVotingClient({
   // standings can flip entirely as ballots arrive and eliminations happen,
   // which can mislead voters mid-poll. Vote count only until the session
   // closes, regardless of resultsLocked/live settings.
-  const suppressRankedBreakdown = session.vote_format === 'ranked' && session.status === 'open'
+  const suppressRankedBreakdown = session.vote_format === 'ranked' && status === 'open'
 
   async function handleSubmitVote() {
     setError(null)
@@ -296,9 +348,34 @@ export function SessionVotingClient({
         <h1 className="font-heading text-3xl text-foreground">{session.title}</h1>
         {session.description && <p className="mt-2 text-sm text-muted">{session.description}</p>}
 
+        {isAdmin && !usingFakeData && status !== 'results_released' && (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-dashed border-border-strong bg-surface/40 px-4 py-3">
+            <p className="text-xs text-muted">
+              {status === 'draft' && "This session is a draft — open it so people can vote."}
+              {status === 'open' && 'Voting is open.'}
+              {status === 'closed' && 'Voting is closed — release results when ready.'}
+            </p>
+            <button
+              type="button"
+              onClick={handleLifecycleAction}
+              disabled={lifecycleLoading}
+              className={`shrink-0 rounded-full px-4 py-2 text-xs font-medium transition hover:opacity-90 disabled:opacity-50 ${theme.primaryButton}`}
+            >
+              {lifecycleLoading
+                ? 'Updating…'
+                : status === 'draft'
+                  ? 'Open Session'
+                  : status === 'open'
+                    ? 'Close Voting'
+                    : 'Release Results'}
+            </button>
+          </div>
+        )}
+        {lifecycleError && <p className="mt-2 text-xs text-red-400">{lifecycleError}</p>}
+
         {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
 
-        {session.status === 'draft' ? (
+        {status === 'draft' ? (
           <p className="mt-8 text-sm text-muted">This session hasn&apos;t opened yet.</p>
         ) : !showResults ? (
           <div className="mt-8">
