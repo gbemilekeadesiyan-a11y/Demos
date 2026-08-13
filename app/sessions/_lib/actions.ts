@@ -147,6 +147,15 @@ export async function createVotingSession(
     ballotSecrecy = workspace?.type === 'ff' ? 'open' : 'secret'
   }
 
+  // TEMP DIAGNOSTIC — remove after debugging the RLS violation
+  const { data: rpcCheck, error: rpcError } = await supabase.rpc('is_workspace_admin', {
+    target_workspace_id: workspaceId,
+  })
+  console.log('[DIAG] user.id =', user.id)
+  console.log('[DIAG] workspaceId =', workspaceId)
+  console.log('[DIAG] is_workspace_admin RPC result =', rpcCheck, 'error =', rpcError)
+  // END TEMP DIAGNOSTIC
+
   // RLS requires the caller to be an active admin of workspaceId — see
   // supabase/migrations/005_voting_sessions.sql.
   const { data, error } = await supabase
