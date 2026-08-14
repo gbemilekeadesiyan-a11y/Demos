@@ -88,7 +88,7 @@ function PizzaSlide() {
 // page a visitor might actually click around in.
 function DashboardSlide() {
   return (
-    <div className="h-full w-full overflow-y-auto bg-background px-8 py-8">
+    <div className="h-full w-full overflow-y-auto bg-background px-8 py-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <p className="text-xs text-muted">Workspace</p>
       <h2 className="font-heading text-2xl text-foreground">Product Team</h2>
 
@@ -114,7 +114,7 @@ function DashboardSlide() {
 // still leaving room below for the past-votes row.
 function FfDinnerSlide() {
   return (
-    <div className="flex h-full w-full flex-col overflow-y-auto bg-background">
+    <div className="flex h-full w-full flex-col overflow-y-auto bg-background [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="min-h-0 flex-1">
         <SessionVotingClient
           sessionId={FF_SESSION.id}

@@ -352,7 +352,9 @@ export function SessionVotingClient({
   return (
     <main
       className={`relative bg-background px-4 ${
-        fill ? 'h-full overflow-y-auto overflow-x-hidden py-8' : 'min-h-screen overflow-hidden py-12'
+        fill
+          ? 'h-full overflow-y-auto overflow-x-hidden py-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
+          : 'min-h-screen overflow-hidden py-12'
       }`}
     >
       <AuraBackground variant={workspaceType === 'ff' ? 'ff' : 'default'} />
