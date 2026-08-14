@@ -1,6 +1,6 @@
 'use server'
 
-import { randomUUID } from 'crypto'
+import { randomBytes, randomUUID } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createClient } from '../../../lib/supabase/server'
 import type { UserSummary } from '../../(auth)/_lib/schema'
@@ -222,6 +222,104 @@ export async function addSessionOption(
   }
 
   return { success: true, optionId: data.id }
+}
+
+// Fetches the session's existing invite code, or creates one — same direct
+// insert pattern as generateInvite (app/workspaces/_lib/actions.ts), reused
+// here so the link can be shown on the session page immediately without
+// having to send an email first. RLS (021_session_invites.sql) rejects the
+// insert unless the session is ff/public_link/anonymous-voting-enabled and
+// the caller is an admin, same conditions the UI already gates this on.
+export async function getSessionInviteCode(
+  sessionId: string
+): Promise<{ success: boolean; error?: string; code?: string }> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    return { success: false, error: 'Not authenticated' }
+  }
+
+  const { data: existing, error: selectError } = await supabase
+    .from('invites')
+    .select('code')
+    .eq('session_id', sessionId)
+    .limit(1)
+    .maybeSingle()
+
+  if (selectError) {
+    return { success: false, error: selectError.message }
+  }
+
+  if (existing) {
+    return { success: true, code: existing.code }
+  }
+
+  const code = randomBytes(6).toString('base64url')
+
+  const { error: insertError } = await supabase.from('invites').insert({
+    session_id: sessionId,
+    code,
+    created_by: user.id,
+  })
+
+  if (insertError) {
+    return { success: false, error: insertError.message }
+  }
+
+  return { success: true, code }
+}
+
+// Thin wrapper around the send-session-invite Edge Function — see
+// supabase/functions/send-session-invite/index.ts. Runs there (not here)
+// because it needs the RESEND_API_KEY secret, which is an Edge Function
+// secret, not something available to Next.js server actions.
+export async function sendSessionVoteInvite(
+  sessionId: string,
+  email: string,
+  origin: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.functions.invoke('send-session-invite', {
+    body: { sessionId, email, origin },
+  })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  return data as { success: boolean; error?: string }
+}
+
+// Thin wrapper around redeem_session_invite_code — see
+// supabase/migrations/021_session_invites.sql. No auth required: this must
+// be callable by a visitor who hasn't signed in (anonymously or otherwise)
+// yet, since it's the first step of app/sessions/vote/page.tsx.
+export async function redeemSessionInviteCode(code: string): Promise<{
+  success: boolean
+  error?: string
+  sessionId?: string
+  sessionTitle?: string
+}> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.rpc('redeem_session_invite_code', { p_code: code })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  const result = data as { success: boolean; error?: string; session_id?: string; session_title?: string }
+
+  if (!result.success) {
+    return { success: false, error: result.error ?? 'Invalid or expired code' }
+  }
+
+  return { success: true, sessionId: result.session_id, sessionTitle: result.session_title }
 }
 
 // Either a specific user or a department (workspace_groups.id) — never

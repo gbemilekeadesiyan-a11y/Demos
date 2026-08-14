@@ -1,10 +1,19 @@
 'use client'
 
-import { useEffect, useRef, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { AuraBackground } from '@/components/AuraBackground'
-import { castVote, closeSession, getSessionResults, listSessionVoters, openSession, releaseResults } from '../../_lib/actions'
+import {
+  castVote,
+  closeSession,
+  getSessionInviteCode,
+  getSessionResults,
+  listSessionVoters,
+  openSession,
+  releaseResults,
+  sendSessionVoteInvite,
+} from '../../_lib/actions'
 import type { RankedRound, SessionOption, SessionVoter, VotingSession } from '../../_lib/schema'
 import { ResultsDisplay } from './ResultsDisplay'
 
@@ -174,6 +183,60 @@ export function SessionVotingClient({
     }
 
     setLifecycleLoading(false)
+  }
+
+  const [linkCopied, setLinkCopied] = useState(false)
+
+  function handleCopyLink() {
+    navigator.clipboard.writeText(`${window.location.origin}/sessions/${sessionId}`)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
+  }
+
+  const canSendVoteInvite = workspaceType === 'ff' && session.who_can_vote === 'public_link' && session.allow_anonymous_vote
+
+  const [inviteCodeLink, setInviteCodeLink] = useState<string | null>(null)
+  const [inviteCodeLinkCopied, setInviteCodeLinkCopied] = useState(false)
+
+  useEffect(() => {
+    if (!isAdmin || usingFakeData || !canSendVoteInvite) return
+
+    getSessionInviteCode(sessionId).then((result) => {
+      if (result.success && result.code) {
+        setInviteCodeLink(`${window.location.origin}/sessions/vote?code=${result.code}`)
+      }
+    })
+  }, [sessionId, isAdmin, usingFakeData, canSendVoteInvite])
+
+  function handleCopyInviteCodeLink() {
+    if (!inviteCodeLink) return
+    navigator.clipboard.writeText(inviteCodeLink)
+    setInviteCodeLinkCopied(true)
+    setTimeout(() => setInviteCodeLinkCopied(false), 2000)
+  }
+
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteSent, setInviteSent] = useState(false)
+
+  async function handleSendInvite(e: FormEvent) {
+    e.preventDefault()
+    setInviteLoading(true)
+    setInviteError(null)
+    setInviteSent(false)
+
+    const result = await sendSessionVoteInvite(sessionId, inviteEmail, window.location.origin)
+
+    setInviteLoading(false)
+
+    if (!result.success) {
+      setInviteError(result.error ?? 'Could not send invite')
+      return
+    }
+
+    setInviteSent(true)
+    setInviteEmail('')
   }
 
   const [hasVoted, setHasVoted] = useState(initialHasVoted)
@@ -400,6 +463,68 @@ export function SessionVotingClient({
           </div>
         )}
         {lifecycleError && <p className="mt-2 text-xs text-red-400">{lifecycleError}</p>}
+
+        {isAdmin && !usingFakeData && (
+          <div className="mt-4 rounded-lg border border-dashed border-border-strong bg-surface/40 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs text-muted">Share this session</p>
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+              >
+                {linkCopied ? 'Copied!' : 'Copy Session Link'}
+              </button>
+            </div>
+
+            {canSendVoteInvite ? (
+              <>
+                {inviteCodeLink && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={inviteCodeLink}
+                      onFocus={(e) => e.target.select()}
+                      className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCopyInviteCodeLink}
+                      className="shrink-0 rounded-full border border-border px-3 py-2 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+                    >
+                      {inviteCodeLinkCopied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                )}
+                <form onSubmit={handleSendInvite} className="mt-3 flex items-center gap-2">
+                <input
+                  type="email"
+                  required
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="Email address"
+                  className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground outline-none focus:border-border-strong"
+                />
+                <button
+                  type="submit"
+                  disabled={inviteLoading}
+                  className={`shrink-0 rounded-full px-3 py-2 text-xs font-medium transition hover:opacity-90 disabled:opacity-50 ${theme.primaryButton}`}
+                >
+                  {inviteLoading ? 'Sending…' : 'Send Voting Invite'}
+                </button>
+                </form>
+              </>
+            ) : (
+              <p className="mt-3 text-xs text-muted">
+                Voting invite emails (vote without an account) are only available for F&amp;F sessions set to public
+                link with anonymous voting enabled.
+              </p>
+            )}
+
+            {inviteSent && <p className="mt-2 text-xs text-emerald-400">Invite sent.</p>}
+            {inviteError && <p className="mt-2 text-xs text-red-400">{inviteError}</p>}
+          </div>
+        )}
 
         {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
 
