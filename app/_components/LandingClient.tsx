@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AuraBackground } from '@/components/AuraBackground'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { Wordmark } from '@/components/Wordmark'
+import { HeroCarousel } from './HeroCarousel'
 import type { UserSummary } from '@/app/(auth)/_lib/schema'
 
 // In-page anchors, not separate routes — Product jumps to the screenshot in
@@ -530,15 +531,7 @@ export function LandingClient({ currentUser }: { currentUser: UserSummary | null
             )}
           </div>
 
-          {/* TODO: replace with a real product screenshot (recommend ~2400x1500, 16:10) */}
-          <div
-            id="product"
-            className="relative mx-auto mt-16 aspect-[16/10] w-full max-w-4xl scroll-mt-24 overflow-hidden rounded-2xl border border-foreground/10 bg-foreground/5 shadow-2xl backdrop-blur-md"
-          >
-            <div className="flex h-full items-center justify-center">
-              <p className="text-sm text-subtle">Product screenshot coming soon</p>
-            </div>
-          </div>
+          <HeroCarousel />
         </section>
 
         <ProofStrip />

@@ -95,6 +95,8 @@ export function SessionVotingClient({
   workspaceType,
   usingFakeData,
   isAdmin,
+  fill = false,
+  suppressPlaceholderBanner = false,
 }: {
   sessionId: string
   session: VotingSession
@@ -109,6 +111,18 @@ export function SessionVotingClient({
   workspaceType: WorkspaceType
   usingFakeData: boolean
   isAdmin: boolean
+  // `min-h-screen` (below) is 100vh of the real browser viewport, not the
+  // nearest container — correct for an actual /sessions/[id] page, wrong
+  // for mounting this inside a small fixed-size preview (e.g. the landing
+  // page's carousel), where it would blow past the frame entirely. `fill`
+  // switches the root to h-full of whatever box it's given instead.
+  fill?: boolean
+  // Independent of `usingFakeData` (which also skips the live-results
+  // subscription and makes vote submission a local-only no-op — both still
+  // apply): the yellow "showing placeholder data" banner is meant for a
+  // real page silently falling back to mock data, not for a page that's
+  // intentionally, permanently presentational.
+  suppressPlaceholderBanner?: boolean
 }) {
   const theme = THEME[workspaceType]
 
@@ -336,7 +350,11 @@ export function SessionVotingClient({
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-background px-4 py-12">
+    <main
+      className={`relative bg-background px-4 ${
+        fill ? 'h-full overflow-y-auto overflow-x-hidden py-8' : 'min-h-screen overflow-hidden py-12'
+      }`}
+    >
       <AuraBackground variant={workspaceType === 'ff' ? 'ff' : 'default'} />
 
       <div className="relative mx-auto max-w-lg">
@@ -347,7 +365,7 @@ export function SessionVotingClient({
           ← Back to dashboard
         </Link>
 
-        {usingFakeData && (
+        {usingFakeData && !suppressPlaceholderBanner && (
           <p className="mb-6 mt-4 rounded-lg border border-yellow-800 bg-yellow-950/50 px-4 py-2 text-xs text-yellow-400">
             Showing placeholder data — getSessionDetails isn&apos;t returning a real session yet.
           </p>
