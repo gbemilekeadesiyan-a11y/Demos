@@ -186,6 +186,7 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          display_order: number
           id: string
           image_url: string | null
           label: string
@@ -194,6 +195,7 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          display_order?: number
           id?: string
           image_url?: string | null
           label: string
@@ -202,6 +204,7 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          display_order?: number
           id?: string
           image_url?: string | null
           label?: string
@@ -269,18 +272,21 @@ export type Database = {
       votes: {
         Row: {
           created_at: string
+          guest_email: string | null
           id: string
           session_id: string
           user_id: string
         }
         Insert: {
           created_at?: string
+          guest_email?: string | null
           id?: string
           session_id: string
           user_id: string
         }
         Update: {
           created_at?: string
+          guest_email?: string | null
           id?: string
           session_id?: string
           user_id?: string
@@ -542,8 +548,14 @@ export type Database = {
         Returns: boolean
       }
       join_workspace_by_code: { Args: { p_code: string }; Returns: Json }
+      peek_workspace_invite_code: { Args: { p_code: string }; Returns: Json }
+      redeem_session_invite_code: { Args: { p_code: string }; Returns: Json }
       respond_to_invite: {
         Args: { p_accept: boolean; p_membership_id: string }
+        Returns: Json
+      }
+      set_vote_guest_email: {
+        Args: { p_email: string; p_session_id: string }
         Returns: Json
       }
       transfer_workspace_ownership: {
