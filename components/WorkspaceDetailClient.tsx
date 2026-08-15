@@ -635,13 +635,22 @@ export function WorkspaceDetailClient({
               Require admin verification to join
             </label>
 
-            <button
-              onClick={handleGenerateInvite}
-              disabled={inviteLoading}
-              className={`mt-3 rounded-full px-4 py-2 text-xs font-medium transition hover:opacity-90 disabled:opacity-50 ${theme.primaryBtnClass}`}
-            >
-              {inviteLoading ? 'Generating…' : 'Generate Invite Link'}
-            </button>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                onClick={handleGenerateInvite}
+                disabled={inviteLoading}
+                className={`rounded-full px-4 py-2 text-xs font-medium transition hover:opacity-90 disabled:opacity-50 ${theme.primaryBtnClass}`}
+              >
+                {inviteLoading ? 'Generating…' : 'Generate Invite Link'}
+              </button>
+              <button
+                onClick={handleGenerateInvite}
+                disabled={inviteLoading}
+                className="rounded-full border border-border px-4 py-2 text-xs text-muted transition hover:border-border-strong hover:text-foreground disabled:opacity-50"
+              >
+                {inviteLoading ? 'Generating…' : 'Generate Workspace Code'}
+              </button>
+            </div>
 
             {inviteLink && (
               <div className="mt-4 flex flex-col items-start gap-3">
@@ -650,6 +659,9 @@ export function WorkspaceDetailClient({
                   value={inviteLink}
                   className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground outline-none"
                 />
+                <p className="text-xs text-muted">
+                  Or enter this code at /join: <span className="font-medium text-foreground">{inviteCode}</span>
+                </p>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {qrSrc && (
                   <img src={qrSrc} alt="Invite QR code" className="h-32 w-32 rounded-lg border border-border" />

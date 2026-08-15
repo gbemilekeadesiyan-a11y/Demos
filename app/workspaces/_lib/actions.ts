@@ -131,6 +131,45 @@ export async function joinWorkspaceByCode(
   return { success: true, workspaceId: result.workspace_id, status: result.status }
 }
 
+// Read-only counterpart to joinWorkspaceByCode — see
+// supabase/migrations/022_peek_workspace_invite_code.sql. Lets app/join
+// see a code's target workspace type before deciding which branch to show,
+// without consuming a use or writing a membership row.
+export async function peekWorkspaceInviteCode(code: string): Promise<{
+  success: boolean
+  error?: string
+  workspaceId?: string
+  workspaceType?: 'standard' | 'ff'
+  workspaceName?: string
+}> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.rpc('peek_workspace_invite_code', { p_code: code })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  const result = data as {
+    success: boolean
+    error?: string
+    workspace_id?: string
+    workspace_type?: 'standard' | 'ff'
+    workspace_name?: string
+  }
+
+  if (!result.success) {
+    return { success: false, error: result.error ?? 'Invalid or expired code' }
+  }
+
+  return {
+    success: true,
+    workspaceId: result.workspace_id,
+    workspaceType: result.workspace_type,
+    workspaceName: result.workspace_name,
+  }
+}
+
 export async function approveMembership(
   membershipId: string
 ): Promise<{ success: boolean; error?: string }> {

@@ -1,14 +1,18 @@
 'use client'
 
 import { Suspense, useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
 import { PasswordConfirmModal } from '@/components/PasswordConfirmModal'
 import { getSurfaceAccess, signInAnonymously } from '@/app/(auth)/_lib/actions'
 import { redeemSessionInviteCode } from '@/app/sessions/_lib/actions'
-import { joinWorkspaceByCode } from '../workspaces/_lib/actions'
+import { joinWorkspaceByCode, peekWorkspaceInviteCode } from '../workspaces/_lib/actions'
 
 const CODE_LENGTH = 8
+
+type PendingWorkspace = { id: string; type: 'standard' | 'ff'; name: string; code: string }
+type JoinOutcome = { workspaceId: string; status: 'active' | 'pending' }
 
 function JoinForm() {
   const router = useRouter()
@@ -27,7 +31,11 @@ function JoinForm() {
   // holds the session it resolved to while the two possible next prompts
   // (below) decide what happens next.
   const [pendingSession, setPendingSession] = useState<{ id: string; title: string } | null>(null)
+  // Same idea for a workspace/F&F-group code — peeked (not yet joined) via
+  // peekWorkspaceInviteCode, see supabase/migrations/022_peek_workspace_invite_code.sql.
+  const [pendingWorkspace, setPendingWorkspace] = useState<PendingWorkspace | null>(null)
   const [showPasswordPrompt, setShowPasswordPrompt] = useState(false)
+  const [joinOutcome, setJoinOutcome] = useState<JoinOutcome | null>(null)
 
   const code = digits.join('')
 
@@ -66,7 +74,9 @@ function JoinForm() {
 
   function resetToEntry() {
     setPendingSession(null)
+    setPendingWorkspace(null)
     setShowPasswordPrompt(false)
+    setJoinOutcome(null)
     setDigits(Array.from({ length: CODE_LENGTH }, () => ''))
     setError(null)
     inputRefs.current[0]?.focus()
@@ -76,9 +86,8 @@ function JoinForm() {
     setLoading(true)
     setError(null)
 
-    // Try it as a session invite code first — falls back to the existing
-    // workspace-invite flow unchanged if it isn't one. See
-    // supabase/migrations/021_session_invites.sql.
+    // Try it as a session invite code first — falls back to the workspace
+    // flow below if it isn't one. See supabase/migrations/021_session_invites.sql.
     const sessionResult = await redeemSessionInviteCode(fullCode)
 
     if (sessionResult.success && sessionResult.sessionId) {
@@ -96,16 +105,58 @@ function JoinForm() {
       return
     }
 
-    const workspaceResult = await joinWorkspaceByCode(fullCode)
+    // Not a session code — peek it as a workspace/F&F-group code without
+    // consuming it yet, so we know which prompt to show first.
+    const peekResult = await peekWorkspaceInviteCode(fullCode)
 
-    setLoading(false)
-
-    if (!workspaceResult.success) {
-      setError(workspaceResult.error ?? 'Invalid or expired code')
+    if (!peekResult.success || !peekResult.workspaceId || !peekResult.workspaceType) {
+      setLoading(false)
+      setError(peekResult.error ?? 'Invalid or expired code')
       return
     }
 
-    router.push(`/workspaces/${workspaceResult.workspaceId}`)
+    const access = await getSurfaceAccess()
+    const needsFf = peekResult.workspaceType === 'ff'
+    const hasRequiredAccess = access.success === true && (needsFf ? access.hasFf === true : access.hasWorkspaces === true)
+
+    if (!hasRequiredAccess) {
+      setLoading(false)
+      setPendingWorkspace({
+        id: peekResult.workspaceId,
+        type: peekResult.workspaceType,
+        name: peekResult.workspaceName ?? (needsFf ? 'this F&F group' : 'this workspace'),
+        code: fullCode,
+      })
+      return
+    }
+
+    if (needsFf) {
+      // Has F&F access, but joining an F&F group from here is a
+      // workspaces→F&F switch — same password-confirm pattern as the
+      // session-code path, gating the join itself, not just navigation.
+      setLoading(false)
+      setPendingWorkspace({
+        id: peekResult.workspaceId,
+        type: peekResult.workspaceType,
+        name: peekResult.workspaceName ?? 'this F&F group',
+        code: fullCode,
+      })
+      setShowPasswordPrompt(true)
+      return
+    }
+
+    // Standard workspace, already has workspaces access — no switch needed,
+    // join directly, same as this page always did.
+    const joinResult = await joinWorkspaceByCode(fullCode)
+
+    setLoading(false)
+
+    if (!joinResult.success || !joinResult.workspaceId) {
+      setError(joinResult.error ?? 'Invalid or expired code')
+      return
+    }
+
+    setJoinOutcome({ workspaceId: joinResult.workspaceId, status: joinResult.status ?? 'active' })
   }
 
   async function handleVoteWithoutAccount() {
@@ -124,6 +175,26 @@ function JoinForm() {
     }
 
     router.push(`/sessions/${pendingSession.id}`)
+  }
+
+  async function handleJoinWorkspaceAfterPassword() {
+    if (!pendingWorkspace) return
+
+    setLoading(true)
+    setError(null)
+
+    const result = await joinWorkspaceByCode(pendingWorkspace.code)
+
+    setLoading(false)
+    setShowPasswordPrompt(false)
+
+    if (!result.success || !result.workspaceId) {
+      setError(result.error ?? 'Could not join')
+      setPendingWorkspace(null)
+      return
+    }
+
+    setJoinOutcome({ workspaceId: result.workspaceId, status: result.status ?? 'active' })
   }
 
   return (
@@ -163,6 +234,43 @@ function JoinForm() {
               </button>
             </div>
           </div>
+        ) : pendingWorkspace && !showPasswordPrompt && !joinOutcome ? (
+          <div className="mt-8 flex w-full max-w-xs flex-col items-center gap-3">
+            <p className="text-sm text-foreground">
+              You&apos;ve entered a code to join{' '}
+              {pendingWorkspace.type === 'ff' ? 'the F&F group' : 'the workspace'}{' '}
+              <span className="font-medium">&quot;{pendingWorkspace.name}&quot;</span>, but you don&apos;t have{' '}
+              {pendingWorkspace.type === 'ff' ? 'F&F' : 'workspaces'} access yet.
+            </p>
+            <div className="mt-1 flex w-full gap-2">
+              <Link
+                href="/login"
+                className="flex-1 rounded-lg bg-accent px-4 py-2.5 text-center text-sm font-medium text-accent-foreground transition hover:opacity-90"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/signup"
+                className="flex-1 rounded-lg border border-border-strong px-4 py-2.5 text-center text-sm text-muted transition hover:border-foreground/40"
+              >
+                Sign Up
+              </Link>
+            </div>
+          </div>
+        ) : joinOutcome ? (
+          <div className="mt-8 flex w-full max-w-xs flex-col items-center gap-3">
+            <p className="text-sm text-foreground">
+              {joinOutcome.status === 'active'
+                ? "You've joined!"
+                : 'Request sent — waiting for admin approval.'}
+            </p>
+            <button
+              onClick={() => router.push(`/workspaces/${joinOutcome.workspaceId}`)}
+              className="w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground transition hover:opacity-90"
+            >
+              Continue
+            </button>
+          </div>
         ) : (
           <div className="mt-8 flex gap-2">
             {digits.map((digit, index) => (
@@ -193,6 +301,16 @@ function JoinForm() {
           description="You've entered a code for a dēmos public F&F session — enter your password to switch account."
           confirmLabel="Switch & Vote"
           onConfirm={() => router.push(`/sessions/${pendingSession.id}`)}
+          onCancel={resetToEntry}
+        />
+      )}
+
+      {pendingWorkspace && showPasswordPrompt && (
+        <PasswordConfirmModal
+          title={`Switch to dēmos ${pendingWorkspace.type === 'ff' ? 'Friends & Family' : 'Workspaces'}`}
+          description={`You've entered a code to join "${pendingWorkspace.name}" — enter your password to switch account.`}
+          confirmLabel="Switch & Join"
+          onConfirm={handleJoinWorkspaceAfterPassword}
           onCancel={resetToEntry}
         />
       )}
