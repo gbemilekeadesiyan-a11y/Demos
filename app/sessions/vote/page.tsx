@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
 import { signInAnonymously } from '@/app/(auth)/_lib/actions'
+import { createClient } from '@/lib/supabase/client'
 import { redeemSessionInviteCode } from '../_lib/actions'
 
 function VoteEntryForm() {
@@ -15,6 +16,10 @@ function VoteEntryForm() {
   const [joining, setJoining] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [session, setSession] = useState<{ id: string; title: string } | null>(null)
+  // Arriving via a direct link isn't a workspaces→F&F surface switch (that
+  // only applies to app/join/page.tsx), so an already-authenticated visitor
+  // here — any account, no password step needed — just goes straight in.
+  const [alreadySignedIn, setAlreadySignedIn] = useState(false)
 
   async function checkCode(candidate: string) {
     if (!candidate.trim()) return
@@ -23,7 +28,9 @@ function VoteEntryForm() {
     setError(null)
     setSession(null)
 
-    const result = await redeemSessionInviteCode(candidate.trim())
+    const [result, {
+      data: { user },
+    }] = await Promise.all([redeemSessionInviteCode(candidate.trim()), createClient().auth.getUser()])
 
     setChecking(false)
 
@@ -32,6 +39,7 @@ function VoteEntryForm() {
       return
     }
 
+    setAlreadySignedIn(user !== null)
     setSession({ id: result.sessionId, title: result.sessionTitle ?? 'this session' })
   }
 
@@ -99,21 +107,32 @@ function VoteEntryForm() {
             <p className="text-sm text-foreground">
               You&apos;re invited to vote on <span className="font-medium">&quot;{session.title}&quot;</span>.
             </p>
-            <button
-              onClick={handleVoteWithoutAccount}
-              disabled={joining}
-              className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
-            >
-              {joining ? 'Starting…' : 'Vote Without an Account'}
-            </button>
+            {alreadySignedIn ? (
+              <button
+                onClick={() => router.push(`/sessions/${session.id}`)}
+                className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-medium text-accent-foreground transition hover:opacity-90"
+              >
+                Continue to Session
+              </button>
+            ) : (
+              <button
+                onClick={handleVoteWithoutAccount}
+                disabled={joining}
+                className="w-full rounded-lg bg-accent px-4 py-3 text-sm font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
+              >
+                {joining ? 'Starting…' : 'Vote Without an Account'}
+              </button>
+            )}
           </div>
         )}
 
         {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
 
-        <a href="/login" className="mt-6 text-xs text-muted transition hover:text-foreground">
-          Have an account? Sign in instead
-        </a>
+        {!alreadySignedIn && (
+          <a href="/login" className="mt-6 text-xs text-muted transition hover:text-foreground">
+            Have an account? Sign in instead
+          </a>
+        )}
       </div>
     </main>
   )

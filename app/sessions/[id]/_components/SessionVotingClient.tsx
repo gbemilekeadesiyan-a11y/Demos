@@ -195,6 +195,7 @@ export function SessionVotingClient({
 
   const canSendVoteInvite = workspaceType === 'ff' && session.who_can_vote === 'public_link' && session.allow_anonymous_vote
 
+  const [inviteCode, setInviteCode] = useState<string | null>(null)
   const [inviteCodeLink, setInviteCodeLink] = useState<string | null>(null)
   const [inviteCodeLinkCopied, setInviteCodeLinkCopied] = useState(false)
 
@@ -203,6 +204,7 @@ export function SessionVotingClient({
 
     getSessionInviteCode(sessionId).then((result) => {
       if (result.success && result.code) {
+        setInviteCode(result.code)
         setInviteCodeLink(`${window.location.origin}/sessions/vote?code=${result.code}`)
       }
     })
@@ -480,20 +482,25 @@ export function SessionVotingClient({
             {canSendVoteInvite ? (
               <>
                 {inviteCodeLink && (
-                  <div className="mt-3 flex items-center gap-2">
-                    <input
-                      readOnly
-                      value={inviteCodeLink}
-                      onFocus={(e) => e.target.select()}
-                      className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground outline-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleCopyInviteCodeLink}
-                      className="shrink-0 rounded-full border border-border px-3 py-2 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
-                    >
-                      {inviteCodeLinkCopied ? 'Copied!' : 'Copy'}
-                    </button>
+                  <div className="mt-3 flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={inviteCodeLink}
+                        onFocus={(e) => e.target.select()}
+                        className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCopyInviteCodeLink}
+                        className="shrink-0 rounded-full border border-border px-3 py-2 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+                      >
+                        {inviteCodeLinkCopied ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <p className="text-xs text-muted">
+                      Or enter this code at /join: <span className="font-medium text-foreground">{inviteCode}</span>
+                    </p>
                   </div>
                 )}
                 <form onSubmit={handleSendInvite} className="mt-3 flex items-center gap-2">

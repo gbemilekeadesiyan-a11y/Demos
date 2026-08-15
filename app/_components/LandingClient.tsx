@@ -471,6 +471,12 @@ export function LandingClient({ currentUser }: { currentUser: UserSummary | null
                     {link.label}
                   </Link>
                 ))}
+                <Link
+                  href="/join"
+                  className="rounded-full border border-border-strong px-4 py-1.5 text-xs text-muted transition hover:border-accent hover:text-accent"
+                >
+                  Join by Code
+                </Link>
               </nav>
             </div>
 
