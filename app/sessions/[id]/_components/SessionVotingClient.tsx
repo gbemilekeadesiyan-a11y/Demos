@@ -13,6 +13,7 @@ import {
   openSession,
   releaseResults,
   sendSessionVoteInvite,
+  setVoteGuestEmail,
 } from '../../_lib/actions'
 import type { RankedRound, SessionOption, SessionVoter, VotingSession } from '../../_lib/schema'
 import { ResultsDisplay } from './ResultsDisplay'
@@ -104,6 +105,7 @@ export function SessionVotingClient({
   workspaceType,
   usingFakeData,
   isAdmin,
+  isAnonymousVoter = false,
   fill = false,
   suppressPlaceholderBanner = false,
 }: {
@@ -120,6 +122,7 @@ export function SessionVotingClient({
   workspaceType: WorkspaceType
   usingFakeData: boolean
   isAdmin: boolean
+  isAnonymousVoter?: boolean
   // `min-h-screen` (below) is 100vh of the real browser viewport, not the
   // nearest container — correct for an actual /sessions/[id] page, wrong
   // for mounting this inside a small fixed-size preview (e.g. the landing
@@ -239,6 +242,33 @@ export function SessionVotingClient({
 
     setInviteSent(true)
     setInviteEmail('')
+  }
+
+  // Shown once, right after an anonymous voter's first vote — asks whether
+  // they want the results emailed when the session ends. Dismissed for
+  // good (this render) either by submitting or by "No thanks"; not shown
+  // again if they already had a vote on page load (initialHasVoted).
+  const [showGuestEmailPrompt, setShowGuestEmailPrompt] = useState(false)
+  const [guestEmail, setGuestEmail] = useState('')
+  const [guestEmailLoading, setGuestEmailLoading] = useState(false)
+  const [guestEmailError, setGuestEmailError] = useState<string | null>(null)
+  const [guestEmailSaved, setGuestEmailSaved] = useState(false)
+
+  async function handleSaveGuestEmail(e: FormEvent) {
+    e.preventDefault()
+    setGuestEmailLoading(true)
+    setGuestEmailError(null)
+
+    const result = await setVoteGuestEmail(sessionId, guestEmail)
+
+    setGuestEmailLoading(false)
+
+    if (!result.success) {
+      setGuestEmailError(result.error ?? 'Could not save your email')
+      return
+    }
+
+    setGuestEmailSaved(true)
   }
 
   const [hasVoted, setHasVoted] = useState(initialHasVoted)
@@ -401,6 +431,10 @@ export function SessionVotingClient({
     setHasVoted(true)
     setShowResults(true)
 
+    if (isAnonymousVoter) {
+      setShowGuestEmailPrompt(true)
+    }
+
     if (resultsResult.success) {
       setResults(resultsResult.results ?? [])
       setTotalVotes(resultsResult.totalVotes ?? 0)
@@ -534,6 +568,45 @@ export function SessionVotingClient({
         )}
 
         {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+
+        {showGuestEmailPrompt && (
+          <div className="mt-4 rounded-lg border border-dashed border-border-strong bg-surface/40 px-4 py-3">
+            {guestEmailSaved ? (
+              <p className="text-xs text-emerald-400">We&apos;ll email you when the results are in.</p>
+            ) : (
+              <>
+                <p className="text-xs text-muted">
+                  Want the results emailed to you when voting ends?
+                </p>
+                <form onSubmit={handleSaveGuestEmail} className="mt-3 flex items-center gap-2">
+                  <input
+                    type="email"
+                    required
+                    value={guestEmail}
+                    onChange={(e) => setGuestEmail(e.target.value)}
+                    placeholder="Email address"
+                    className="min-w-0 flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-foreground outline-none focus:border-border-strong"
+                  />
+                  <button
+                    type="submit"
+                    disabled={guestEmailLoading}
+                    className={`shrink-0 rounded-full px-3 py-2 text-xs font-medium transition hover:opacity-90 disabled:opacity-50 ${theme.primaryButton}`}
+                  >
+                    {guestEmailLoading ? 'Saving…' : 'Notify Me'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowGuestEmailPrompt(false)}
+                    className="shrink-0 rounded-full border border-border px-3 py-2 text-xs text-muted transition hover:border-border-strong hover:text-foreground"
+                  >
+                    No thanks
+                  </button>
+                </form>
+                {guestEmailError && <p className="mt-2 text-xs text-red-400">{guestEmailError}</p>}
+              </>
+            )}
+          </div>
+        )}
 
         {status === 'draft' ? (
           <p className="mt-8 text-sm text-muted">This session hasn&apos;t opened yet.</p>

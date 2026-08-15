@@ -79,6 +79,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
 
   let workspaceType: 'standard' | 'ff' = 'standard'
   let isAdmin = false
+  let isAnonymousVoter = false
 
   if (!usingFakeData) {
     const { data: workspaceRow } = await supabase
@@ -98,6 +99,8 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     const {
       data: { user },
     } = await supabase.auth.getUser()
+
+    isAnonymousVoter = user?.is_anonymous === true
 
     if (user) {
       const { data: membership } = await supabase
@@ -163,6 +166,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       workspaceType={workspaceType}
       usingFakeData={usingFakeData}
       isAdmin={isAdmin}
+      isAnonymousVoter={isAnonymousVoter}
     />
   )
 }

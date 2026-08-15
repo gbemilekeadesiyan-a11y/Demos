@@ -23,6 +23,9 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')!
 const WEBHOOK_SECRET = Deno.env.get('WEBHOOK_SECRET')
 const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') ?? 'dēmos <onboarding@resend.dev>'
+// Not deployed yet — defaults to localhost until `supabase secrets set
+// SITE_URL=https://yourdomain` is run with a real production URL.
+const SITE_URL = Deno.env.get('SITE_URL') ?? 'http://localhost:3000'
 
 type WebhookPayload = {
   type: 'INSERT' | 'UPDATE' | 'DELETE'
@@ -54,6 +57,16 @@ type NotificationDraft = {
   emailBody: string
 }
 
+// An anonymous voter who left an email (votes.guest_email, see
+// 023_vote_guest_email.sql) has no auth.users email to resolve and no
+// reliable "portal" to check an in-app notification in — sent directly,
+// bypassing both.
+type GuestEmailDraft = {
+  email: string
+  subject: string
+  body: string
+}
+
 Deno.serve(async (req) => {
   // Fails closed: with no WEBHOOK_SECRET configured, every request is
   // rejected rather than trusted, since --no-verify-jwt makes this URL
@@ -74,57 +87,66 @@ Deno.serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
   let drafts: NotificationDraft[] = []
+  let guestEmails: GuestEmailDraft[] = []
 
   if (payload.table === 'voting_sessions' && payload.type === 'UPDATE' && payload.record) {
-    drafts = await draftSessionStatusNotifications(
+    const result = await draftSessionStatusNotifications(
       supabase,
       payload.record as VotingSessionRecord,
       payload.old_record as { status: string } | null
     )
+    drafts = result.drafts
+    guestEmails = result.guestEmails
   } else if (payload.table === 'invites' && payload.type === 'INSERT' && payload.record) {
     drafts = await draftInviteNotifications(supabase, payload.record as InviteRecord)
   }
 
-  if (drafts.length === 0) {
+  if (drafts.length === 0 && guestEmails.length === 0) {
     return new Response(JSON.stringify({ notified: 0 }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
   }
 
-  const { error: insertError } = await supabase.from('notifications').insert(
-    drafts.map((draft) => ({ user_id: draft.userId, type: draft.type, payload: draft.payload }))
-  )
+  if (drafts.length > 0) {
+    const { error: insertError } = await supabase.from('notifications').insert(
+      drafts.map((draft) => ({ user_id: draft.userId, type: draft.type, payload: draft.payload }))
+    )
 
-  if (insertError) {
-    console.error('Failed to insert notifications:', insertError.message)
+    if (insertError) {
+      console.error('Failed to insert notifications:', insertError.message)
+    }
   }
 
   // Emails are sent independently of (and don't block on) the in-app
   // insert above — a bounced/slow email shouldn't stop other recipients'
   // in-app notifications from landing, and vice versa.
-  await Promise.all(drafts.map((draft) => sendEmail(supabase, draft)))
+  await Promise.all([
+    ...drafts.map((draft) => sendEmail(supabase, draft)),
+    ...guestEmails.map((draft) => sendGuestEmail(draft.email, draft.subject, draft.body)),
+  ])
 
-  return new Response(JSON.stringify({ notified: drafts.length }), {
+  return new Response(JSON.stringify({ notified: drafts.length + guestEmails.length }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
   })
 })
 
 // Recipients per demos-system-design.md § 8.3: active workspace members for
-// all_members sessions, session_access_grants for invited_list sessions.
-// public_link sessions have no bounded recipient set (could be anyone with
-// the link, including anonymous voters with no notifications row to write
-// to) — deliberately not notified here.
+// all_members sessions, session_access_grants for invited_list sessions —
+// plus, for results_released specifically, everyone who actually voted
+// (see the votes query below), added on top rather than replacing the
+// eligibility-based set. That's also the only way a public_link session
+// notifies anyone at all, since it has no bounded "eligible" set otherwise.
 async function draftSessionStatusNotifications(
   supabase: SupabaseClient,
   record: VotingSessionRecord,
   oldRecord: { status: string } | null
-): Promise<NotificationDraft[]> {
-  if (oldRecord?.status === record.status) return []
-  if (record.status !== 'open' && record.status !== 'results_released') return []
+): Promise<{ drafts: NotificationDraft[]; guestEmails: GuestEmailDraft[] }> {
+  if (oldRecord?.status === record.status) return { drafts: [], guestEmails: [] }
+  if (record.status !== 'open' && record.status !== 'results_released') return { drafts: [], guestEmails: [] }
 
-  let recipientIds: string[] = []
+  const recipientIds = new Set<string>()
 
   if (record.who_can_vote === 'all_members') {
     const { data } = await supabase
@@ -132,30 +154,54 @@ async function draftSessionStatusNotifications(
       .select('user_id')
       .eq('workspace_id', record.workspace_id)
       .eq('status', 'active')
-    recipientIds = (data ?? []).map((row) => row.user_id as string)
+    for (const row of data ?? []) recipientIds.add(row.user_id as string)
   } else if (record.who_can_vote === 'invited_list') {
     const { data } = await supabase
       .from('session_access_grants')
       .select('user_id')
       .eq('session_id', record.id)
-    recipientIds = (data ?? []).map((row) => row.user_id as string)
+    for (const row of data ?? []) recipientIds.add(row.user_id as string)
   }
 
   const notifType = record.status === 'open' ? 'session_open' : 'session_results_released'
   const subject =
-    record.status === 'open' ? `Voting is open: ${record.title}` : `Results are in: ${record.title}`
+    record.status === 'open' ? `Voting is open: ${record.title}` : `The results for "${record.title}" are in`
   const body =
     record.status === 'open'
       ? `"${record.title}" is now open for voting.`
-      : `Results for "${record.title}" have been released.`
+      : `The results for "${record.title}" are in. Click link to see\n${SITE_URL}/sessions/${record.id}`
 
-  return recipientIds.map((userId) => ({
+  const guestEmails: GuestEmailDraft[] = []
+
+  if (record.status === 'results_released') {
+    const { data: voterRows } = await supabase
+      .from('votes')
+      .select('user_id, guest_email')
+      .eq('session_id', record.id)
+
+    for (const row of voterRows ?? []) {
+      const guestEmail = row.guest_email as string | null
+      if (guestEmail) {
+        // No auth.users row worth resolving an email from, and no
+        // reliable portal to check an in-app notification in — send
+        // straight to the address they left, bypassing recipientIds
+        // entirely.
+        guestEmails.push({ email: guestEmail, subject, body })
+      } else {
+        recipientIds.add(row.user_id as string)
+      }
+    }
+  }
+
+  const drafts = [...recipientIds].map((userId) => ({
     userId,
     type: notifType,
     payload: { sessionId: record.id, sessionTitle: record.title, workspaceId: record.workspace_id },
     emailSubject: subject,
     emailBody: body,
   }))
+
+  return { drafts, guestEmails }
 }
 
 // Recipients: the workspace's other active admins (not the creator — they
@@ -220,6 +266,28 @@ async function sendEmail(supabase: SupabaseClient, draft: NotificationDraft): Pr
         subject: draft.emailSubject,
         text: draft.emailBody,
       }),
+    })
+
+    if (!response.ok) {
+      console.error('Resend request failed:', response.status, await response.text())
+    }
+  } catch (err) {
+    console.error('Resend request threw:', err)
+  }
+}
+
+// Same Resend call as sendEmail, but for an address that came directly
+// from votes.guest_email rather than an auth.users lookup — no userId to
+// resolve, so no notifications row and no getUserById round trip.
+async function sendGuestEmail(email: string, subject: string, body: string): Promise<void> {
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ from: FROM_EMAIL, to: email, subject, text: body }),
     })
 
     if (!response.ok) {

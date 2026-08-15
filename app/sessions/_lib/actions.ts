@@ -475,6 +475,33 @@ export async function castVote(
   return { success: true }
 }
 
+// Thin wrapper around set_vote_guest_email — see
+// supabase/migrations/023_vote_guest_email.sql. Lets an anonymous voter
+// optionally leave an email for the results-released notification.
+export async function setVoteGuestEmail(
+  sessionId: string,
+  email: string
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase.rpc('set_vote_guest_email', {
+    p_session_id: sessionId,
+    p_email: email,
+  })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  const result = data as { success: boolean; error?: string }
+
+  if (!result.success) {
+    return { success: false, error: result.error ?? 'Could not save your email' }
+  }
+
+  return { success: true }
+}
+
 export async function listSessions(
   workspaceId: string,
   filter?: { status?: 'draft' | 'open' | 'closed' | 'results_released'; createdByMe?: boolean }
