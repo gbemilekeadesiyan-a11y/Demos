@@ -174,12 +174,6 @@ export async function signOut(): Promise<{ success: boolean; error?: string }> {
   return { success: true }
 }
 
-export async function joinSessionByCode(
-  code: string
-): Promise<{ success: boolean; error?: string; sessionId?: string }> {
-  throw new Error('not implemented')
-}
-
 export async function updateProfile(formData: {
   username?: string
   firstName?: string

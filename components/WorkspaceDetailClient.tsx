@@ -389,7 +389,6 @@ export function WorkspaceDetailClient({
   initialMembers,
   initialPendingRequests,
   isAdmin,
-  usingFakeData,
 }: {
   workspaceId: string
   workspace: Workspace
@@ -397,7 +396,6 @@ export function WorkspaceDetailClient({
   initialMembers: WorkspaceMembership[]
   initialPendingRequests: WorkspaceMembership[]
   isAdmin: boolean
-  usingFakeData: boolean
 }) {
   const theme = DETAIL_THEME[workspace.type === 'ff' ? 'ff' : 'standard']
   const ownerId = workspace.createdBy?.id
@@ -496,12 +494,6 @@ export function WorkspaceDetailClient({
       <AuraBackground variant={workspace.type === 'ff' ? 'ff' : 'default'} />
 
       <div className="relative mx-auto max-w-2xl">
-        {usingFakeData && (
-          <p className="mb-6 rounded-lg border border-yellow-800 bg-yellow-950/50 px-4 py-2 text-xs text-yellow-400">
-            Showing placeholder data — getWorkspaceDetails isn&apos;t implemented yet.
-          </p>
-        )}
-
         <Link href="/workspaces" className="text-sm text-muted transition hover:text-foreground">
           ← Back to dashboard
         </Link>

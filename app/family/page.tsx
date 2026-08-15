@@ -9,66 +9,6 @@ import { listNotifications } from '../notifications/_lib/actions'
 import type { Notification } from '../notifications/_lib/schema'
 import { WorkspaceDashboardClient } from '@/components/WorkspaceDashboardClient'
 
-function buildFakeSessions(workspaceId: string): VotingSession[] {
-  const now = new Date().toISOString()
-  return [
-    {
-      id: 'fake-s1',
-      workspace_id: workspaceId,
-      title: 'Where should we eat lunch tomorrow?',
-      description: null,
-      vote_format: 'single',
-      visibility: 'public',
-      status: 'open',
-      who_can_vote: 'all_members',
-      allow_anonymous_vote: true,
-      results_visibility: 'hidden_until_close',
-      results_style: null,
-      ballot_secrecy: 'open',
-      start_time: null,
-      end_time: null,
-      createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
-      created_at: now,
-    },
-    {
-      id: 'fake-s2',
-      workspace_id: workspaceId,
-      title: 'Best UI/UX design software',
-      description: null,
-      vote_format: 'single',
-      visibility: 'public',
-      status: 'closed',
-      who_can_vote: 'public_link',
-      allow_anonymous_vote: true,
-      results_visibility: 'live',
-      results_style: null,
-      ballot_secrecy: 'open',
-      start_time: null,
-      end_time: null,
-      createdBy: { id: 'fake-user-2', username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
-      created_at: now,
-    },
-    {
-      id: 'fake-s3',
-      workspace_id: workspaceId,
-      title: 'Family trip destination',
-      description: null,
-      vote_format: 'ranked',
-      visibility: 'public',
-      status: 'results_released',
-      who_can_vote: 'all_members',
-      allow_anonymous_vote: false,
-      results_visibility: 'after_you_vote',
-      results_style: null,
-      ballot_secrecy: 'open',
-      start_time: null,
-      end_time: null,
-      createdBy: { id: 'fake-user-3', username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
-      created_at: now,
-    },
-  ]
-}
-
 export default async function FamilyPage() {
   const supabase = await createClient()
   const {
@@ -103,15 +43,14 @@ export default async function FamilyPage() {
   const initialWorkspaceId = workspaces[0]?.id ?? null
 
   let initialSessions: VotingSession[] = []
-  let usingFakeSessions = false
+  let sessionsError = false
 
   if (initialWorkspaceId) {
     const sessionsResult = await listSessions(initialWorkspaceId)
     if (sessionsResult.success) {
       initialSessions = sessionsResult.sessions ?? []
     } else {
-      usingFakeSessions = true
-      initialSessions = buildFakeSessions(initialWorkspaceId)
+      sessionsError = true
     }
   }
 
@@ -129,7 +68,7 @@ export default async function FamilyPage() {
       workspaces={workspaces}
       initialWorkspaceId={initialWorkspaceId}
       initialSessions={initialSessions}
-      usingFakeSessions={usingFakeSessions}
+      sessionsError={sessionsError}
       currentUser={currentUser}
       currentUserId={user?.id ?? null}
       initialNotifications={initialNotifications}

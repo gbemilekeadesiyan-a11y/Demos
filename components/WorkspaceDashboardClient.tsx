@@ -101,84 +101,6 @@ function greetingPhrase(): string {
   return 'Good evening'
 }
 
-function buildFakeSessions(workspaceId: string): VotingSession[] {
-  const now = new Date().toISOString()
-  return [
-    {
-      id: 'fake-s1',
-      workspace_id: workspaceId,
-      title: 'Where should we eat lunch tomorrow?',
-      description: null,
-      vote_format: 'single',
-      visibility: 'public',
-      status: 'open',
-      who_can_vote: 'all_members',
-      allow_anonymous_vote: true,
-      results_visibility: 'hidden_until_close',
-      results_style: null,
-      ballot_secrecy: 'secret',
-      start_time: null,
-      end_time: null,
-      createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
-      created_at: now,
-    },
-    {
-      id: 'fake-s2',
-      workspace_id: workspaceId,
-      title: 'Q3 roadmap priorities',
-      description: null,
-      vote_format: 'multiple',
-      visibility: 'private',
-      status: 'draft',
-      who_can_vote: 'all_members',
-      allow_anonymous_vote: false,
-      results_visibility: 'hidden_until_close',
-      results_style: null,
-      ballot_secrecy: 'secret',
-      start_time: null,
-      end_time: null,
-      createdBy: { id: 'fake-admin', username: 'you', firstName: 'You', lastName: '' },
-      created_at: now,
-    },
-    {
-      id: 'fake-s3',
-      workspace_id: workspaceId,
-      title: 'Best UI/UX design software',
-      description: null,
-      vote_format: 'single',
-      visibility: 'public',
-      status: 'closed',
-      who_can_vote: 'public_link',
-      allow_anonymous_vote: true,
-      results_visibility: 'live',
-      results_style: null,
-      ballot_secrecy: 'secret',
-      start_time: null,
-      end_time: null,
-      createdBy: { id: 'fake-user-2', username: 'jane.doe', firstName: 'Jane', lastName: 'Doe' },
-      created_at: now,
-    },
-    {
-      id: 'fake-s4',
-      workspace_id: workspaceId,
-      title: 'Team offsite location',
-      description: null,
-      vote_format: 'ranked',
-      visibility: 'public',
-      status: 'results_released',
-      who_can_vote: 'all_members',
-      allow_anonymous_vote: false,
-      results_visibility: 'after_you_vote',
-      results_style: null,
-      ballot_secrecy: 'secret',
-      start_time: null,
-      end_time: null,
-      createdBy: { id: 'fake-user-3', username: 'sam.lee', firstName: 'Sam', lastName: 'Lee' },
-      created_at: now,
-    },
-  ]
-}
-
 function currentUserDisplayName(user: UserSummary | null) {
   if (!user) return 'Guest'
   const fullName = `${user.firstName} ${user.lastName}`.trim()
@@ -190,7 +112,7 @@ export function WorkspaceDashboardClient({
   workspaces,
   initialWorkspaceId,
   initialSessions,
-  usingFakeSessions,
+  sessionsError,
   currentUser,
   currentUserId,
   initialNotifications,
@@ -200,7 +122,7 @@ export function WorkspaceDashboardClient({
   workspaces: Workspace[]
   initialWorkspaceId: string | null
   initialSessions: VotingSession[]
-  usingFakeSessions: boolean
+  sessionsError: boolean
   currentUser: UserSummary | null
   currentUserId: string | null
   initialNotifications: Notification[]
@@ -210,7 +132,7 @@ export function WorkspaceDashboardClient({
   const chrome = SURFACE_CHROME[surface]
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(initialWorkspaceId)
   const [sessions, setSessions] = useState(initialSessions)
-  const [usingFake, setUsingFake] = useState(usingFakeSessions)
+  const [sessionsFailedToLoad, setSessionsFailedToLoad] = useState(sessionsError)
   const [tab, setTab] = useState<Tab>('active')
   const [loading, setLoading] = useState(false)
 
@@ -243,15 +165,15 @@ export function WorkspaceDashboardClient({
 
     if (result.success) {
       setSessions(result.sessions ?? [])
-      setUsingFake(false)
+      setSessionsFailedToLoad(false)
     } else {
-      setSessions(buildFakeSessions(workspaceId))
-      setUsingFake(true)
+      setSessions([])
+      setSessionsFailedToLoad(true)
     }
   }
 
   useEffect(() => {
-    if (!selectedWorkspaceId || usingFake) {
+    if (!selectedWorkspaceId || sessionsFailedToLoad) {
       setStatsData(null)
       setSummaryById(new Map())
       setStatsAvailable(false)
@@ -281,7 +203,7 @@ export function WorkspaceDashboardClient({
     return () => {
       cancelled = true
     }
-  }, [selectedWorkspaceId, usingFake])
+  }, [selectedWorkspaceId, sessionsFailedToLoad])
 
   const filtered = sessions.filter((session) => {
     if (tab === 'active') return session.status === 'open'
@@ -405,12 +327,6 @@ export function WorkspaceDashboardClient({
           </p>
         ) : (
           <>
-            {usingFake && (
-              <p className="mb-6 inline-block rounded-lg border border-yellow-800 bg-yellow-950/50 px-4 py-2 text-xs text-yellow-400">
-                Showing placeholder sessions — listSessions isn&apos;t returning real data for this workspace yet.
-              </p>
-            )}
-
             {theme.greeting && (
               <p className="text-sm text-muted">
                 {greetingPhrase()}, {currentUser?.firstName?.trim() || 'there'}!
@@ -477,6 +393,8 @@ export function WorkspaceDashboardClient({
             <div className="mt-4">
               {loading ? (
                 <p className="py-8 text-sm text-muted">Loading…</p>
+              ) : sessionsFailedToLoad ? (
+                <p className="py-8 text-sm text-red-400">Couldn&apos;t load sessions for this workspace.</p>
               ) : filtered.length === 0 ? (
                 <p className="py-8 text-sm text-muted">No sessions here yet.</p>
               ) : (
