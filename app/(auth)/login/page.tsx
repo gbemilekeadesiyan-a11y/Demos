@@ -80,7 +80,9 @@ export default function LoginPage() {
       <main className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="w-full max-w-2xl">
           <div className="flex flex-col items-center text-center">
-            <Logo className="mb-6 h-8 w-auto text-foreground" />
+            <Link href="/" className="mb-6 inline-block">
+              <Logo className="h-8 w-auto text-foreground" />
+            </Link>
             <h1 className="text-2xl font-semibold text-foreground">Where to?</h1>
             <p className="mt-2 text-sm text-muted">Your account has access to both.</p>
           </div>
@@ -106,7 +108,9 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
-          <Logo className="mb-6 h-8 w-auto text-foreground" />
+          <Link href="/" className="mb-6 inline-block">
+            <Logo className="h-8 w-auto text-foreground" />
+          </Link>
           <h1 className="text-2xl font-semibold text-foreground">Welcome back</h1>
           <p className="mt-2 text-sm text-muted">Log in to dēmos to keep voting.</p>
         </div>

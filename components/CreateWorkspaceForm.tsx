@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { AuraBackground } from '@/components/AuraBackground'
 import { Logo } from '@/components/Logo'
 import { createWorkspace } from '@/app/workspaces/_lib/actions'
@@ -78,9 +79,12 @@ export function CreateWorkspaceForm({ type }: { type: 'standard' | 'ff' }) {
 
       <div className="relative w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
-          <div className={`mb-6 rounded-2xl border p-3 backdrop-blur-sm ${copy.logoWrapClass}`}>
+          <Link
+            href="/"
+            className={`mb-6 inline-block rounded-2xl border p-3 backdrop-blur-sm ${copy.logoWrapClass}`}
+          >
             <Logo className="h-6 w-auto text-foreground" />
-          </div>
+          </Link>
           <h1 className="font-heading text-3xl text-foreground">{copy.heading}</h1>
           <p className="mt-3 text-sm text-muted">{copy.description}</p>
         </div>

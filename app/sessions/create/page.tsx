@@ -2,7 +2,9 @@
 
 import { Fragment, Suspense, useEffect, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { AuraBackground } from '@/components/AuraBackground'
+import { Logo } from '@/components/Logo'
 import { addSessionOption, canCreateSession, createVotingSession, grantSessionAccess } from '../_lib/actions'
 import { listDepartments } from '@/app/workspaces/_lib/actions'
 import type { DepartmentWithMembers } from '@/app/workspaces/_lib/schema'
@@ -363,7 +365,14 @@ function CreateSessionForm() {
       <AuraBackground variant={isFf ? 'ff' : 'default'} />
 
       <div className="relative mx-auto max-w-lg">
-        <button onClick={() => router.back()} className="text-sm text-muted transition hover:text-foreground">
+        <Link href="/" className="inline-block">
+          <Logo className="h-5 w-auto text-foreground" />
+        </Link>
+
+        <button
+          onClick={() => router.back()}
+          className="mt-4 block text-sm text-muted transition hover:text-foreground"
+        >
           ← Back
         </button>
 

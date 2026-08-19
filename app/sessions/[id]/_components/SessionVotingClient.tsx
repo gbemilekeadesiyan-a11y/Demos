@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'rea
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { AuraBackground } from '@/components/AuraBackground'
+import { Logo } from '@/components/Logo'
 import {
   castVote,
   closeSession,
@@ -459,9 +460,13 @@ export function SessionVotingClient({
       <AuraBackground variant={workspaceType === 'ff' ? 'ff' : 'default'} />
 
       <div className="relative mx-auto max-w-lg">
+        <Link href="/" className="inline-block">
+          <Logo className="h-5 w-auto text-foreground" />
+        </Link>
+
         <Link
           href={workspaceType === 'ff' ? '/family' : '/workspaces'}
-          className="text-sm text-muted transition hover:text-foreground"
+          className="mt-4 block text-sm text-muted transition hover:text-foreground"
         >
           ← Back to dashboard
         </Link>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, type FormEvent } from 'react'
+import Link from 'next/link'
 import { Logo } from '@/components/Logo'
 import { signUp } from '../_lib/actions'
 import {
@@ -157,7 +158,9 @@ export default function SignupPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="w-full max-w-sm text-center">
-          <Logo className="mx-auto mb-6 h-8 w-auto text-foreground" />
+          <Link href="/" className="mb-6 inline-block">
+            <Logo className="mx-auto h-8 w-auto text-foreground" />
+          </Link>
           <h1 className="text-2xl font-semibold text-foreground">Check your email</h1>
           <p className="mt-2 text-sm text-muted">
             We sent a verification link to {form.email}. Click it to activate your account.
@@ -171,7 +174,9 @@ export default function SignupPage() {
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
-          <Logo className="mb-6 h-8 w-auto text-foreground" />
+          <Link href="/" className="mb-6 inline-block">
+            <Logo className="h-8 w-auto text-foreground" />
+          </Link>
           <h1 className="text-2xl font-semibold text-foreground">Create your account</h1>
           <p className="mt-2 text-sm text-muted">Join dēmos to create and vote on sessions.</p>
         </div>

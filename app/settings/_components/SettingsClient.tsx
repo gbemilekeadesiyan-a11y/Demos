@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
+import { Logo } from '@/components/Logo'
 import { changePassword, deleteAccount, updateEmail, updateProfile } from '../../(auth)/_lib/actions'
 import { getWorkspaceDetails, leaveWorkspace, transferOwnership } from '../../workspaces/_lib/actions'
 import type { Workspace } from '../../workspaces/_lib/schema'
@@ -41,7 +42,10 @@ export function SettingsClient({
 
       <div className="relative mx-auto flex max-w-lg flex-col gap-10">
         <div>
-          <Link href="/workspaces" className="text-sm text-muted transition hover:text-foreground">
+          <Link href="/" className="inline-block">
+            <Logo className="h-5 w-auto text-foreground" />
+          </Link>
+          <Link href="/workspaces" className="mt-4 block text-sm text-muted transition hover:text-foreground">
             ← Back
           </Link>
           <h1 className="mt-4 font-heading text-3xl text-foreground">Settings</h1>

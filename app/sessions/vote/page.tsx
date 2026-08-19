@@ -2,7 +2,9 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { AuraBackground } from '@/components/AuraBackground'
+import { Logo } from '@/components/Logo'
 import { signInAnonymously } from '@/app/(auth)/_lib/actions'
 import { createClient } from '@/lib/supabase/client'
 import { redeemSessionInviteCode } from '../_lib/actions'
@@ -74,6 +76,10 @@ function VoteEntryForm() {
       <AuraBackground />
 
       <div className="relative flex w-full max-w-sm flex-col items-center text-center">
+        <Link href="/" className="mb-6 inline-block">
+          <Logo className="h-8 w-auto text-foreground" />
+        </Link>
+
         <h1 className="font-heading text-3xl text-foreground">Vote Without an Account</h1>
         <p className="mt-2 text-sm text-muted">Enter your invite code to find your session.</p>
 

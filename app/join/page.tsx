@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState, type ClipboardEvent, type Keyboa
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AuraBackground } from '@/components/AuraBackground'
+import { Logo } from '@/components/Logo'
 import { PasswordConfirmModal } from '@/components/PasswordConfirmModal'
 import { getSurfaceAccess, signInAnonymously } from '@/app/(auth)/_lib/actions'
 import { redeemSessionInviteCode } from '@/app/sessions/_lib/actions'
@@ -202,6 +203,10 @@ function JoinForm() {
       <AuraBackground />
 
       <div className="relative flex flex-col items-center text-center">
+        <Link href="/" className="mb-6 inline-block">
+          <Logo className="h-8 w-auto text-foreground" />
+        </Link>
+
         <div className="mb-6 flex gap-1.5">
           {[0, 1, 2, 3, 4, 5].map((dot) => (
             <span key={dot} className="h-1.5 w-1.5 rounded-full bg-border-strong" />

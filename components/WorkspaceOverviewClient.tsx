@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { AuraBackground } from '@/components/AuraBackground'
+import { Logo } from '@/components/Logo'
 import { SessionSummaryCard, StatCard } from '@/components/SessionOverviewCards'
 import type { WorkspaceSessionSummary, WorkspaceStats } from '@/app/workspaces/_lib/schema'
 
@@ -64,7 +65,14 @@ export function WorkspaceOverviewClient({
       <AuraBackground variant={workspaceType === 'ff' ? 'ff' : 'default'} />
 
       <div className="relative mx-auto max-w-6xl">
-        <Link href={`${theme.base}/${workspaceId}`} className="text-sm text-muted transition hover:text-foreground">
+        <Link href="/" className="inline-block">
+          <Logo className="h-5 w-auto text-foreground" />
+        </Link>
+
+        <Link
+          href={`${theme.base}/${workspaceId}`}
+          className="mt-4 block text-sm text-muted transition hover:text-foreground"
+        >
           ← {theme.backLabel}
         </Link>
 
