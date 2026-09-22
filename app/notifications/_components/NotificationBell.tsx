@@ -1,11 +1,9 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
 import { respondToInvite } from '@/app/workspaces/_lib/actions'
-import { markAllNotificationsRead, markNotificationRead } from '../_lib/actions'
 import type { Notification } from '../_lib/schema'
 
 type Tab = 'all' | 'unread'
@@ -217,32 +215,29 @@ function formatTimestamp(dateStr: string): string {
 
 export function NotificationBell({
   userId,
-  initialNotifications,
+  notifications,
+  onMarkRead,
+  onMarkAllRead,
 }: {
   userId: string | null
-  initialNotifications: Notification[]
+  notifications: Notification[]
+  onMarkRead: (id: string) => void
+  onMarkAllRead: () => void
 }) {
-  const [notifications, setNotifications] = useState(initialNotifications)
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('all')
+  // Anchor point for the desktop floating panel only — applied via CSS
+  // custom properties that the mobile layout's `inset-0` never reads (see
+  // the panel's className below), so which layout actually shows up is
+  // decided entirely by the `md:` breakpoint in CSS, not by this value or
+  // any viewport check in JS. That keeps the server-rendered markup and the
+  // client's first render identical regardless of the real device width,
+  // which a `window.innerWidth`/`matchMedia` read in the render path can't
+  // guarantee — the check only runs on the client, so the very first client
+  // render (before hydration) would disagree with the server's.
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
-  const [isMobile, setIsMobile] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-
-  // Below md the panel goes full-screen instead of floating near the bell —
-  // matchMedia rather than a resize listener on window.innerWidth since it
-  // only needs to know which side of the md breakpoint we're on, not the
-  // exact width.
-  useEffect(() => {
-    const query = window.matchMedia('(max-width: 767px)')
-    setIsMobile(query.matches)
-    function onChange(e: MediaQueryListEvent) {
-      setIsMobile(e.matches)
-    }
-    query.addEventListener('change', onChange)
-    return () => query.removeEventListener('change', onChange)
-  }, [])
 
   // Local-only resolution state for direct-invite cards — respondToInvite
   // mutates workspace_memberships (the source of truth), not the
@@ -254,39 +249,6 @@ export function NotificationBell({
   const [respondErrors, setRespondErrors] = useState<Record<string, string>>({})
 
   const unreadCount = notifications.filter((n) => !n.read).length
-
-  // Requires public.notifications to be in the supabase_realtime
-  // publication — see supabase/migrations/012_notifications_realtime.sql.
-  // RLS ("Users can view their own notifications") still scopes delivery
-  // per-subscriber, but the filter here keeps the channel scoped too.
-  useEffect(() => {
-    if (!userId) return
-
-    const supabase = createClient()
-
-    const channel = supabase
-      .channel(`notifications-${userId}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        (change) => {
-          setNotifications((current) => [change.new as Notification, ...current])
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
-        (change) => {
-          const updated = change.new as Notification
-          setNotifications((current) => current.map((n) => (n.id === updated.id ? updated : n)))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [userId])
 
   // The panel is portaled to document.body (see the render below), so it's
   // no longer a DOM descendant of triggerRef — a click inside it must be
@@ -320,12 +282,16 @@ export function NotificationBell({
   // viewport coordinates instead, recalculated on open and on
   // resize/scroll so it stays anchored to the bell.
   useLayoutEffect(() => {
-    if (!open || isMobile) return
+    if (!open) return
 
+    // Harmless to keep computing this on a narrow viewport where the panel
+    // ends up full-screen instead — the CSS that positions the panel below
+    // md never reads these values (see the panel's className), so there's
+    // nothing here for a real mobile device to get wrong.
     function updatePosition() {
       const rect = triggerRef.current?.getBoundingClientRect()
       if (!rect) return
-      const panelWidth = 384 // matches the panel's w-96
+      const panelWidth = 384 // matches the panel's md:w-96
       const margin = 16
       const left = Math.min(rect.left, window.innerWidth - panelWidth - margin)
       setPosition({ top: rect.bottom + 8, left: Math.max(margin, left) })
@@ -338,28 +304,20 @@ export function NotificationBell({
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [open, isMobile])
+  }, [open])
 
-  // Full-screen on mobile — lock the page behind it so it doesn't scroll
-  // underneath the panel, same as the dashboard's off-canvas nav drawer.
+  // Lock the page behind the panel so it doesn't scroll underneath —
+  // matters most for the mobile full-screen layout, but harmless for the
+  // desktop floating one too, same as the dashboard's off-canvas nav
+  // drawer.
   useEffect(() => {
-    if (!open || !isMobile) return
+    if (!open) return
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => {
       document.body.style.overflow = previousOverflow
     }
-  }, [open, isMobile])
-
-  async function handleMarkRead(id: string) {
-    setNotifications((current) => current.map((n) => (n.id === id ? { ...n, read: true } : n)))
-    await markNotificationRead(id)
-  }
-
-  async function handleMarkAllRead() {
-    setNotifications((current) => current.map((n) => ({ ...n, read: true })))
-    await markAllNotificationsRead()
-  }
+  }, [open])
 
   async function handleRespondToInvite(n: Notification, accept: boolean) {
     const membershipId = (n.payload as Record<string, unknown>).membershipId
@@ -378,7 +336,7 @@ export function NotificationBell({
     }
 
     setResponded((current) => ({ ...current, [n.id]: accept ? 'accepted' : 'declined' }))
-    if (!n.read) handleMarkRead(n.id)
+    if (!n.read) onMarkRead(n.id)
   }
 
   if (!userId) return null
@@ -413,16 +371,21 @@ export function NotificationBell({
       </button>
 
       {open &&
-        (isMobile || position) &&
         createPortal(
           <div
             ref={panelRef}
-            style={isMobile ? undefined : { top: position!.top, left: position!.left }}
-            className={
-              isMobile
-                ? 'fixed inset-0 z-[9999] flex flex-col overflow-hidden bg-surface'
-                : 'fixed z-[9999] w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-surface/[0.98] shadow-2xl backdrop-blur-2xl'
+            // The md: breakpoint alone decides full-screen (mobile) vs.
+            // floating-card (desktop) — --notif-top/--notif-left are only
+            // ever read by the md: rules below, so there's no JS viewport
+            // check deciding what to render; the browser's own media query
+            // evaluation is what's authoritative, and it's the same on the
+            // server-rendered markup and the client's first paint.
+            style={
+              position
+                ? ({ '--notif-top': `${position.top}px`, '--notif-left': `${position.left}px` } as CSSProperties)
+                : undefined
             }
+            className="fixed inset-0 z-[9999] flex flex-col overflow-hidden bg-surface md:inset-auto md:top-[var(--notif-top)] md:left-[var(--notif-left)] md:w-96 md:max-w-[calc(100vw-2rem)] md:rounded-2xl md:border md:border-border md:bg-surface/[0.98] md:shadow-2xl md:backdrop-blur-2xl"
           >
             <div className="flex shrink-0 items-center justify-between border-b border-divider px-4 py-3">
               <h2 className="font-heading text-lg text-foreground">Notifications</h2>
@@ -453,7 +416,7 @@ export function NotificationBell({
               ))}
             </div>
 
-            <div className={`overflow-y-auto px-2 py-3 ${isMobile ? 'flex-1' : 'max-h-96'}`}>
+            <div className="flex-1 overflow-y-auto px-2 py-3 md:max-h-96 md:flex-none">
               {groups.length === 0 ? (
                 <p className="px-2 py-8 text-center text-sm text-muted">
                   {tab === 'unread' ? "You're all caught up." : 'No notifications yet.'}
@@ -528,7 +491,7 @@ export function NotificationBell({
                                       <Link
                                         href={view.href}
                                         onClick={() => {
-                                          if (!n.read) handleMarkRead(n.id)
+                                          if (!n.read) onMarkRead(n.id)
                                           setOpen(false)
                                         }}
                                         className="rounded-full border border-border px-2.5 py-1 text-foreground transition hover:border-border-strong"
@@ -538,7 +501,7 @@ export function NotificationBell({
                                       {!n.read && (
                                         <button
                                           type="button"
-                                          onClick={() => handleMarkRead(n.id)}
+                                          onClick={() => onMarkRead(n.id)}
                                           className="text-muted transition hover:text-foreground"
                                         >
                                           Mark as read
@@ -571,7 +534,7 @@ export function NotificationBell({
               </Link>
               <button
                 type="button"
-                onClick={handleMarkAllRead}
+                onClick={onMarkAllRead}
                 disabled={unreadCount === 0}
                 className="rounded-full border border-border px-3 py-1.5 text-xs text-foreground transition hover:border-border-strong disabled:opacity-40"
               >

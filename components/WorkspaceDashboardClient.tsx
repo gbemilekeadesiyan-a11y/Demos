@@ -13,6 +13,7 @@ import type { UserSummary } from '@/app/(auth)/_lib/schema'
 import { listSessions } from '@/app/sessions/_lib/actions'
 import type { VotingSession } from '@/app/sessions/_lib/schema'
 import { NotificationBell } from '@/app/notifications/_components/NotificationBell'
+import { useNotifications } from '@/app/notifications/_lib/useNotifications'
 import type { Notification } from '@/app/notifications/_lib/schema'
 import { getWorkspaceSessionSummaries, getWorkspaceStats } from '@/app/workspaces/_lib/actions'
 import type { Workspace, WorkspaceSessionSummary, WorkspaceStats } from '@/app/workspaces/_lib/schema'
@@ -166,6 +167,14 @@ export function WorkspaceDashboardClient({
   // below that — this is the only state driving which one's showing.
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
+  // Both bell buttons below (mobile top bar, desktop sidebar) are in the DOM
+  // at once — one is just `hidden` via CSS depending on breakpoint, not
+  // unmounted — so subscribing to notifications once here and handing the
+  // same state/handlers to both keeps there from being two independent
+  // `notifications-${currentUserId}` realtime channels racing to `.on()` an
+  // already-`.subscribe()`d one.
+  const { notifications, markRead, markAllRead } = useNotifications(currentUserId, initialNotifications)
+
   useEffect(() => {
     if (!mobileNavOpen) return
     const previousOverflow = document.body.style.overflow
@@ -301,7 +310,7 @@ export function WorkspaceDashboardClient({
           <Link href="/" className="flex items-center">
             <Logo className="h-6 w-auto text-foreground" />
           </Link>
-          <NotificationBell userId={currentUserId} initialNotifications={initialNotifications} />
+          <NotificationBell userId={currentUserId} notifications={notifications} onMarkRead={markRead} onMarkAllRead={markAllRead} />
         </div>
 
         <nav className="flex flex-col gap-1 text-sm">
@@ -387,7 +396,7 @@ export function WorkspaceDashboardClient({
           <Link href="/" className="flex items-center">
             <Logo className="h-6 w-auto text-foreground" />
           </Link>
-          <NotificationBell userId={currentUserId} initialNotifications={initialNotifications} />
+          <NotificationBell userId={currentUserId} notifications={notifications} onMarkRead={markRead} onMarkAllRead={markAllRead} />
         </div>
 
         {canSwitchSurface && (
