@@ -289,7 +289,7 @@ export function HeroCarousel() {
         ))}
       </div>
 
-      <div className="mt-5 flex items-center justify-center gap-2">
+      <div className="mt-5 flex items-center justify-center gap-1">
         {SLIDES.map((slide, i) => (
           <button
             key={slide.id}
@@ -297,10 +297,15 @@ export function HeroCarousel() {
             aria-label={`Go to slide ${i + 1}: ${slide.label}`}
             aria-current={activeDot === i}
             onClick={() => setIndex(i)}
-            className={`h-1.5 rounded-full transition-all ${
-              activeDot === i ? 'w-6 bg-accent' : 'w-1.5 bg-foreground/20 hover:bg-foreground/35'
-            }`}
-          />
+            className="flex h-11 w-8 items-center justify-center"
+          >
+            <span
+              aria-hidden="true"
+              className={`h-1.5 rounded-full transition-all ${
+                activeDot === i ? 'w-6 bg-accent' : 'w-1.5 bg-foreground/20 hover:bg-foreground/35'
+              }`}
+            />
+          </button>
         ))}
       </div>
     </div>

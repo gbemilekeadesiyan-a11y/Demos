@@ -17,6 +17,22 @@ const NAV_LINKS = [
   { href: '#footer', label: 'About' },
 ]
 
+function MenuIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className={className}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  )
+}
+
+function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className={className}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  )
+}
+
 function useScrolled(threshold = 40) {
   const [scrolled, setScrolled] = useState(false)
 
@@ -447,6 +463,16 @@ function Footer() {
 
 export function LandingClient({ currentUser }: { currentUser: UserSummary | null }) {
   const scrolled = useScrolled()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMobileMenuOpen(false)
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [mobileMenuOpen])
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-background">
@@ -480,13 +506,13 @@ export function LandingClient({ currentUser }: { currentUser: UserSummary | null
               </nav>
             </div>
 
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-2 text-sm sm:gap-4">
               <ThemeToggle />
               {currentUser ? (
                 <HeaderAvatar user={currentUser} />
               ) : (
                 <>
-                  <Link href="/login" className="text-muted transition hover:text-accent">
+                  <Link href="/login" className="hidden text-muted transition hover:text-accent sm:inline">
                     Log in
                   </Link>
                   <Link
@@ -497,8 +523,55 @@ export function LandingClient({ currentUser }: { currentUser: UserSummary | null
                   </Link>
                 </>
               )}
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={mobileMenuOpen}
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-muted transition hover:bg-foreground/5 hover:text-foreground md:hidden"
+              >
+                {mobileMenuOpen ? <CloseIcon className="h-5 w-5" /> : <MenuIcon className="h-5 w-5" />}
+              </button>
             </div>
           </div>
+
+          {mobileMenuOpen && (
+            <nav className="border-t border-divider bg-background/95 px-6 py-4 backdrop-blur-md md:hidden">
+              <ul className="flex flex-col gap-1 text-sm text-muted">
+                {NAV_LINKS.map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex min-h-11 items-center rounded-lg px-2 transition hover:bg-foreground/5 hover:text-foreground"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
+                <li>
+                  <Link
+                    href="/join"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex min-h-11 items-center rounded-lg px-2 transition hover:bg-foreground/5 hover:text-foreground"
+                  >
+                    Join by Code
+                  </Link>
+                </li>
+                {!currentUser && (
+                  <li>
+                    <Link
+                      href="/login"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex min-h-11 items-center rounded-lg px-2 transition hover:bg-foreground/5 hover:text-foreground"
+                    >
+                      Log in
+                    </Link>
+                  </li>
+                )}
+              </ul>
+            </nav>
+          )}
         </header>
 
         {/* Hero — not in the labelled-section list below, so no eyebrow;

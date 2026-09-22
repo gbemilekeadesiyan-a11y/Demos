@@ -277,7 +277,7 @@ function JoinForm() {
             </button>
           </div>
         ) : (
-          <div className="mt-8 flex gap-2">
+          <div className="mt-8 flex gap-1 sm:gap-2">
             {digits.map((digit, index) => (
               <input
                 key={index}
@@ -291,7 +291,7 @@ function JoinForm() {
                 disabled={loading}
                 maxLength={1}
                 inputMode="text"
-                className="h-14 w-12 rounded-lg border border-border-strong bg-surface/80 text-center text-lg text-foreground outline-none backdrop-blur-sm focus:border-foreground/40 disabled:opacity-50"
+                className="h-12 w-9 rounded-lg border border-border-strong bg-surface/80 text-center text-base text-foreground outline-none backdrop-blur-sm focus:border-foreground/40 disabled:opacity-50 sm:h-14 sm:w-12 sm:text-lg"
               />
             ))}
           </div>

@@ -127,19 +127,26 @@ function Stepper({
             disabled={index > maxIndex}
             aria-label={STEP_META[step].title}
             aria-current={index === currentIndex ? 'step' : undefined}
-            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-medium transition ${
-              index === currentIndex
-                ? ff
-                  ? 'bg-fuchsia-500 text-white'
-                  : 'bg-accent text-accent-foreground'
-                : index < currentIndex
-                  ? ff
-                    ? 'bg-fuchsia-500/20 text-fuchsia-300'
-                    : 'bg-accent/20 text-accent'
-                  : 'bg-border-strong text-subtle'
-            } ${index > maxIndex ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xs font-medium transition ${
+              index > maxIndex ? 'cursor-not-allowed' : 'cursor-pointer'
+            }`}
           >
-            {index < currentIndex ? '✓' : index + 1}
+            <span
+              aria-hidden="true"
+              className={`flex h-7 w-7 items-center justify-center rounded-full transition ${
+                index === currentIndex
+                  ? ff
+                    ? 'bg-fuchsia-500 text-white'
+                    : 'bg-accent text-accent-foreground'
+                  : index < currentIndex
+                    ? ff
+                      ? 'bg-fuchsia-500/20 text-fuchsia-300'
+                      : 'bg-accent/20 text-accent'
+                    : 'bg-border-strong text-subtle'
+              }`}
+            >
+              {index < currentIndex ? '✓' : index + 1}
+            </span>
           </button>
           {index < STEPS.length - 1 && (
             <div

@@ -107,6 +107,22 @@ function currentUserDisplayName(user: UserSummary | null) {
   return fullName || user.username
 }
 
+function MenuIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className={className}>
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  )
+}
+
+function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className={className}>
+      <path d="M6 6l12 12M18 6 6 18" />
+    </svg>
+  )
+}
+
 export function WorkspaceDashboardClient({
   surface,
   workspaces,
@@ -146,6 +162,24 @@ export function WorkspaceDashboardClient({
   const [summaryById, setSummaryById] = useState<Map<string, WorkspaceSessionSummary>>(new Map())
   const [statsAvailable, setStatsAvailable] = useState(false)
 
+  // Sidebar is an always-visible column at md+ but an off-canvas drawer
+  // below that — this is the only state driving which one's showing.
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+
+  useEffect(() => {
+    if (!mobileNavOpen) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setMobileNavOpen(false)
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [mobileNavOpen])
+
   async function handleSignOut() {
     await signOut()
     router.push('/')
@@ -159,6 +193,7 @@ export function WorkspaceDashboardClient({
     setSelectedWorkspaceId(workspaceId)
     setLoading(true)
     setTab('active')
+    setMobileNavOpen(false)
 
     const result = await listSessions(workspaceId)
     setLoading(false)
@@ -228,15 +263,41 @@ export function WorkspaceDashboardClient({
     <div className="relative flex min-h-screen overflow-hidden bg-background">
       <AuraBackground variant={surface === 'ff' ? 'ff' : 'default'} />
 
-      <aside className="relative z-10 flex w-60 shrink-0 flex-col border-r border-divider bg-background/80 px-4 py-6">
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 md:hidden"
+          aria-hidden="true"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 max-w-[85vw] shrink-0 flex-col overflow-y-auto border-r border-divider bg-background px-4 py-6 transition-transform duration-200 ease-out md:relative md:z-10 md:w-60 md:max-w-none md:translate-x-0 md:bg-background/80 md:transition-none ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="mb-4 flex items-center justify-between px-1 md:hidden">
+          <Link href="/" className="flex items-center" onClick={() => setMobileNavOpen(false)}>
+            <Logo className="h-6 w-auto text-foreground" />
+          </Link>
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Close menu"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted transition hover:bg-foreground/5 hover:text-foreground"
+          >
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
+
         <Link
           href="/"
-          className={`mb-4 flex items-center gap-1.5 px-1 text-xs text-muted transition ${chrome.homeHoverClass}`}
+          className={`mb-4 hidden items-center gap-1.5 px-1 text-xs text-muted transition md:flex ${chrome.homeHoverClass}`}
         >
           <span aria-hidden="true">←</span> Back to home
         </Link>
 
-        <div className="mb-8 flex items-center justify-between px-1">
+        <div className="mb-8 hidden items-center justify-between px-1 md:flex">
           <Link href="/" className="flex items-center">
             <Logo className="h-6 w-auto text-foreground" />
           </Link>
@@ -244,10 +305,11 @@ export function WorkspaceDashboardClient({
         </div>
 
         <nav className="flex flex-col gap-1 text-sm">
-          <span className={`rounded-lg px-3 py-2 ${chrome.navActiveClass}`}>Dashboard</span>
+          <span className={`rounded-lg px-3 py-3 ${chrome.navActiveClass}`}>Dashboard</span>
           <Link
             href="/join"
-            className="rounded-lg px-3 py-2 text-muted transition hover:bg-foreground/5 hover:text-foreground"
+            onClick={() => setMobileNavOpen(false)}
+            className="rounded-lg px-3 py-3 text-muted transition hover:bg-foreground/5 hover:text-foreground"
           >
             Join by Code
           </Link>
@@ -260,7 +322,7 @@ export function WorkspaceDashboardClient({
               key={workspace.id}
               type="button"
               onClick={() => selectWorkspace(workspace.id)}
-              className={`truncate rounded-lg px-3 py-2 text-left text-sm transition ${
+              className={`truncate rounded-lg px-3 py-3 text-left text-sm transition ${
                 workspace.id === selectedWorkspaceId
                   ? chrome.listActiveClass
                   : 'text-muted hover:bg-foreground/5 hover:text-foreground'
@@ -274,7 +336,8 @@ export function WorkspaceDashboardClient({
 
         <Link
           href={chrome.createHref}
-          className={`mt-4 rounded-lg border border-dashed border-border px-3 py-2 text-center text-xs text-muted transition ${chrome.createHoverClass}`}
+          onClick={() => setMobileNavOpen(false)}
+          className={`mt-4 rounded-lg border border-dashed border-border px-3 py-3 text-center text-xs text-muted transition ${chrome.createHoverClass}`}
         >
           {chrome.createLabel}
         </Link>
@@ -295,14 +358,15 @@ export function WorkspaceDashboardClient({
           <div className="flex flex-col gap-1">
             <Link
               href="/settings"
-              className="rounded-lg px-3 py-2 text-sm text-muted transition hover:bg-foreground/5 hover:text-foreground"
+              onClick={() => setMobileNavOpen(false)}
+              className="rounded-lg px-3 py-3 text-sm text-muted transition hover:bg-foreground/5 hover:text-foreground"
             >
               Settings
             </Link>
             <button
               type="button"
               onClick={handleSignOut}
-              className="rounded-lg px-3 py-2 text-left text-sm text-muted transition hover:bg-foreground/5 hover:text-foreground"
+              className="rounded-lg px-3 py-3 text-left text-sm text-muted transition hover:bg-foreground/5 hover:text-foreground"
             >
               Log out
             </button>
@@ -310,7 +374,22 @@ export function WorkspaceDashboardClient({
         </div>
       </aside>
 
-      <main className="relative z-10 flex-1 px-8 py-10">
+      <main className="relative z-10 flex-1 px-4 py-6 md:px-8 md:py-10">
+        <div className="-mx-4 mb-6 flex items-center justify-between border-b border-divider px-4 pb-4 md:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Open menu"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted transition hover:bg-foreground/5 hover:text-foreground"
+          >
+            <MenuIcon className="h-5 w-5" />
+          </button>
+          <Link href="/" className="flex items-center">
+            <Logo className="h-6 w-auto text-foreground" />
+          </Link>
+          <NotificationBell userId={currentUserId} initialNotifications={initialNotifications} />
+        </div>
+
         {canSwitchSurface && (
           <div className="mb-6 flex justify-end">
             <SwitchSurfaceControl current={surface} />

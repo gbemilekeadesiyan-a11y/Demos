@@ -226,8 +226,23 @@ export function NotificationBell({
   const [open, setOpen] = useState(false)
   const [tab, setTab] = useState<Tab>('all')
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
   const triggerRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+
+  // Below md the panel goes full-screen instead of floating near the bell —
+  // matchMedia rather than a resize listener on window.innerWidth since it
+  // only needs to know which side of the md breakpoint we're on, not the
+  // exact width.
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 767px)')
+    setIsMobile(query.matches)
+    function onChange(e: MediaQueryListEvent) {
+      setIsMobile(e.matches)
+    }
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
 
   // Local-only resolution state for direct-invite cards — respondToInvite
   // mutates workspace_memberships (the source of truth), not the
@@ -305,7 +320,7 @@ export function NotificationBell({
   // viewport coordinates instead, recalculated on open and on
   // resize/scroll so it stays anchored to the bell.
   useLayoutEffect(() => {
-    if (!open) return
+    if (!open || isMobile) return
 
     function updatePosition() {
       const rect = triggerRef.current?.getBoundingClientRect()
@@ -323,7 +338,18 @@ export function NotificationBell({
       window.removeEventListener('resize', updatePosition)
       window.removeEventListener('scroll', updatePosition, true)
     }
-  }, [open])
+  }, [open, isMobile])
+
+  // Full-screen on mobile — lock the page behind it so it doesn't scroll
+  // underneath the panel, same as the dashboard's off-canvas nav drawer.
+  useEffect(() => {
+    if (!open || !isMobile) return
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [open, isMobile])
 
   async function handleMarkRead(id: string) {
     setNotifications((current) => current.map((n) => (n.id === id ? { ...n, read: true } : n)))
@@ -387,32 +413,36 @@ export function NotificationBell({
       </button>
 
       {open &&
-        position &&
+        (isMobile || position) &&
         createPortal(
           <div
             ref={panelRef}
-            style={{ top: position.top, left: position.left }}
-            className="fixed z-[9999] w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-surface/[0.98] shadow-2xl backdrop-blur-2xl"
+            style={isMobile ? undefined : { top: position!.top, left: position!.left }}
+            className={
+              isMobile
+                ? 'fixed inset-0 z-[9999] flex flex-col overflow-hidden bg-surface'
+                : 'fixed z-[9999] w-96 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-border bg-surface/[0.98] shadow-2xl backdrop-blur-2xl'
+            }
           >
-            <div className="flex items-center justify-between border-b border-divider px-4 py-3">
+            <div className="flex shrink-0 items-center justify-between border-b border-divider px-4 py-3">
               <h2 className="font-heading text-lg text-foreground">Notifications</h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close notifications"
-                className="rounded-lg p-1 text-muted transition hover:bg-foreground/5 hover:text-foreground"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-muted transition hover:bg-foreground/5 hover:text-foreground"
               >
-                <CloseIcon className="h-4 w-4" />
+                <CloseIcon className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="flex gap-1 px-4 pt-3">
+            <div className="flex shrink-0 gap-1 px-4 pt-3">
               {(['all', 'unread'] as Tab[]).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setTab(t)}
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                  className={`min-h-11 rounded-full px-3 text-xs font-medium transition ${
                     tab === t
                       ? 'bg-accent text-accent-foreground'
                       : 'text-muted hover:bg-foreground/5 hover:text-foreground'
@@ -423,7 +453,7 @@ export function NotificationBell({
               ))}
             </div>
 
-            <div className="max-h-96 overflow-y-auto px-2 py-3">
+            <div className={`overflow-y-auto px-2 py-3 ${isMobile ? 'flex-1' : 'max-h-96'}`}>
               {groups.length === 0 ? (
                 <p className="px-2 py-8 text-center text-sm text-muted">
                   {tab === 'unread' ? "You're all caught up." : 'No notifications yet.'}
@@ -531,7 +561,7 @@ export function NotificationBell({
               )}
             </div>
 
-            <div className="flex items-center justify-between border-t border-divider px-4 py-3">
+            <div className="flex shrink-0 items-center justify-between border-t border-divider px-4 py-3">
               <Link
                 href="/settings"
                 onClick={() => setOpen(false)}

@@ -41,8 +41,8 @@ export function PasswordConfirmModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-6 shadow-2xl">
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4">
+      <div className="flex min-h-full w-full flex-col justify-center rounded-t-2xl border-t border-border bg-surface p-6 shadow-2xl sm:min-h-0 sm:max-w-sm sm:rounded-2xl sm:border">
         <h2 className="font-heading text-xl text-foreground">{title}</h2>
         <p className="mt-1 text-sm text-muted">{description}</p>
 
@@ -59,18 +59,18 @@ export function PasswordConfirmModal({
 
           {error && <p className="text-sm text-red-400">{error}</p>}
 
-          <div className="mt-1 flex gap-2">
+          <div className="mt-1 flex flex-col gap-2 sm:flex-row">
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 rounded-full bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
+              className="flex-1 rounded-full bg-accent px-4 py-3 text-sm font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50"
             >
               {loading ? 'Verifying…' : confirmLabel}
             </button>
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-full border border-border-strong px-4 py-2.5 text-sm text-muted transition hover:border-foreground/40"
+              className="rounded-full border border-border-strong px-4 py-3 text-sm text-muted transition hover:border-foreground/40"
             >
               Cancel
             </button>
