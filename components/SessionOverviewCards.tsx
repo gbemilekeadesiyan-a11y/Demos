@@ -100,7 +100,15 @@ export function SessionSummaryCard({ session }: { session: SessionCardData }) {
 
       {session.description && <p className="mt-1.5 line-clamp-2 text-xs text-muted">{session.description}</p>}
 
-      <p className="mt-3 text-[11px] text-subtle">Last activity: {formatRelativeTime(session.lastActivity)}</p>
+      {/* suppressHydrationWarning: "Last activity" is relative to render
+          time, which can legitimately differ by a few seconds between the
+          server render and client hydration (and, for the marketing
+          page's mock data specifically, by much more — see
+          heroCarouselMockData.ts) — an expected mismatch React's docs
+          call out this attribute for, not a bug to warn about. */}
+      <p className="mt-3 text-[11px] text-subtle" suppressHydrationWarning>
+        Last activity: {formatRelativeTime(session.lastActivity)}
+      </p>
 
       <div className="mt-4 grid grid-cols-2 gap-3 border-t border-divider pt-4">
         <div>
